@@ -1,0 +1,84 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jobforge"]
+
+[project]
+name = "jobforge-ai"
+version = "1.0.0"
+description = "Autonomous multi-agent job hunting pipeline"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Viraj Bulugahapitiya", email = "amanthavirajavb@gmail.com" }]
+
+dependencies = [
+    # ── Agent Orchestration ──
+    "langgraph>=0.2.0",
+    "langchain>=0.3.0",
+    "langchain-google-genai>=2.0.0",
+
+    # ── LLM & Embeddings ──
+    "google-generativeai>=0.8.0",
+
+    # ── Web Search & Scraping ──
+    "tavily-python>=0.5.0",
+    "httpx>=0.27.0",
+    "aiohttp>=3.9.0",
+    "beautifulsoup4>=4.12.0",
+    "feedparser>=6.0.0",
+
+    # ── Data & Validation ──
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "pandas>=2.1.0",
+    "openpyxl>=3.1.0",
+
+    # ── Persistence ──
+    "aiosqlite>=0.19.0",
+
+    # ── Email ──
+    "resend>=2.0.0",
+
+    # ── Logging ──
+    "structlog>=23.2.0",
+
+    # ── PDF Text Extraction (for hallucination validation) ──
+    "pdfplumber>=0.10.0",
+
+    # ── Misc ──
+    "python-dotenv>=1.0.0",
+    "tenacity>=8.2.0",
+    "tiktoken>=0.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.4.0",
+    "mypy>=1.8.0",
+    "pre-commit>=3.6.0",
+]
+
+[project.scripts]
+jobforge = "scripts.run_pipeline:main"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

@@ -1,0 +1,83 @@
+# JobForge AI — UK AI Startup Watchlist
+# Career pages to monitor for new roles.
+# Add/remove companies as needed — no code changes required.
+
+- company: "Stability AI"
+  careers_url: "https://stability.ai/careers"
+  stage: "growth"
+
+- company: "Wayve"
+  careers_url: "https://wayve.ai/careers"
+  stage: "series_b"
+
+- company: "PolyAI"
+  careers_url: "https://poly.ai/careers"
+  stage: "series_b"
+
+- company: "Synthesia"
+  careers_url: "https://www.synthesia.io/careers"
+  stage: "series_b"
+
+- company: "Faculty AI"
+  careers_url: "https://faculty.ai/careers"
+  stage: "growth"
+
+- company: "Cleo AI"
+  careers_url: "https://web.meetcleo.com/careers"
+  stage: "series_b"
+
+- company: "Moonhub"
+  careers_url: "https://www.moonhub.ai/careers"
+  stage: "seed"
+
+- company: "Cohere"
+  careers_url: "https://cohere.com/careers"
+  stage: "series_b"
+
+- company: "Mistral AI"
+  careers_url: "https://mistral.ai/careers"
+  stage: "series_a"
+
+- company: "Hugging Face"
+  careers_url: "https://huggingface.co/jobs"
+  stage: "growth"
+
+- company: "Graphcore"
+  careers_url: "https://www.graphcore.ai/careers"
+  stage: "growth"
+
+- company: "Benevolent AI"
+  careers_url: "https://www.benevolent.com/careers"
+  stage: "enterprise"
+
+- company: "Tractable"
+  careers_url: "https://tractable.ai/careers"
+  stage: "series_b"
+
+- company: "Monzo"
+  careers_url: "https://monzo.com/careers"
+  stage: "growth"
+
+- company: "Revolut"
+  careers_url: "https://www.revolut.com/careers"
+  stage: "growth"
+
+- company: "Arm"
+  careers_url: "https://careers.arm.com"
+  stage: "enterprise"
+
+- company: "DataKind UK"
+  careers_url: "https://www.datakind.org/careers"
+  stage: "nonprofit"
+
+- company: "Alan Turing Institute"
+  careers_url: "https://www.turing.ac.uk/work-turing"
+  stage: "nonprofit"
+
+- company: "NHS AI Lab"
+  careers_url: "https://transform.england.nhs.uk/ai-lab/ai-lab-careers/"
+  stage: "nonprofit"
+
+- company: "DeepMind"
+  careers_url: "https://deepmind.google/about/careers/"
+  stage: "enterprise"

@@ -1,0 +1,132 @@
+"""
+JobForge AI — Centralised Configuration via Pydantic Settings.
+
+All settings are loaded from environment variables or a .env file.
+Swap any provider by changing a single env var — no code changes required.
+"""
+
+from __future__ import annotations
+
+from datetime import date
+from pathlib import Path
+from typing import Literal
+
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent  # jobforge-ai/
+DATA_DIR = ROOT_DIR / "data"
+OUTPUT_DIR = ROOT_DIR / "outputs"
+
+
+class LLMSettings(BaseSettings):
+    """LLM provider configuration — swap models by changing env vars."""
+
+    model_config = SettingsConfigDict(env_prefix="LLM_", env_file=".env", extra="ignore")
+
+    gemini_api_key: str = Field(alias="GEMINI_API_KEY")
+    fast_model: str = "gemini-2.0-flash"
+    deep_model: str = "gemini-2.5-pro"
+    cost_cap_usd: float = 2.00
+    temperature: float = 0.1
+
+
+class JobSourceSettings(BaseSettings):
+    """API keys and limits for each job source connector."""
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    adzuna_app_id: str = ""
+    adzuna_app_key: str = ""
+    reed_api_key: str = ""
+    tavily_api_key: str = ""
+    serpapi_key: str = ""
+
+    # Per-source daily quotas (respect rate limits)
+    adzuna_daily_quota: int = 200
+    reed_daily_quota: int = 400
+    tavily_daily_quota: int = 100
+
+
+class VisaSettings(BaseSettings):
+    """
+    Graduate Route (PSW) visa context.
+
+    Key logic:
+    - User has FULL work rights for 2 years (no sponsorship needed to work).
+    - Sponsoring roles are strategically prioritised (long-term UK stay).
+    - "UK citizens only" roles are flagged but NOT excluded — user can still
+      apply during PSW window for experience, or the requirement may be flexible.
+    - Roles offering Skilled Worker Visa sponsorship get a scoring BOOST.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="VISA_", env_file=".env", extra="ignore")
+
+    status: str = "psw_graduate_route"
+    expiry_date: date = Field(default_factory=lambda: date(2027, 9, 1))
+    prioritise_sponsoring: bool = True
+
+    # Scoring adjustments (applied in Matchmaker)
+    sponsorship_boost: int = 10      # +10 points if role offers sponsorship
+    citizens_only_penalty: int = 5   # -5 points (not excluded, just deprioritised)
+
+    @property
+    def days_remaining(self) -> int:
+        return max(0, (self.expiry_date - date.today()).days)
+
+    @property
+    def is_expired(self) -> bool:
+        return self.days_remaining == 0
+
+
+class PipelineSettings(BaseSettings):
+    """Pipeline-level thresholds and behaviour."""
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    match_threshold: int = 70
+    embedding_prescreen_threshold: float = 0.45
+    max_tailor_retries: int = 2
+    daily_run_hour: int = 7
+    max_jobs_per_source: int = 50
+
+
+class EmailSettings(BaseSettings):
+    """Email dispatch configuration — supports SMTP or Resend."""
+
+    model_config = SettingsConfigDict(env_prefix="SMTP_", env_file=".env", extra="ignore")
+
+    host: str = "smtp.gmail.com"
+    port: int = 587
+    user: str = ""
+    password: str = ""
+    recipient_email: str = Field(default="", alias="RECIPIENT_EMAIL")
+
+    # Alternative: Resend
+    resend_api_key: str = Field(default="", alias="RESEND_API_KEY")
+    email_from: str = Field(default="", alias="EMAIL_FROM")
+
+    @property
+    def backend(self) -> Literal["smtp", "resend"]:
+        return "resend" if self.resend_api_key else "smtp"
+
+
+class Settings(BaseSettings):
+    """Master settings — aggregates all sub-configs."""
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    llm: LLMSettings = Field(default_factory=LLMSettings)
+    sources: JobSourceSettings = Field(default_factory=JobSourceSettings)
+    visa: VisaSettings = Field(default_factory=VisaSettings)
+    pipeline: PipelineSettings = Field(default_factory=PipelineSettings)
+    email: EmailSettings = Field(default_factory=EmailSettings)
+
+    database_url: str = f"sqlite+aiosqlite:///{DATA_DIR / 'jobforge.db'}"
+    log_level: str = "INFO"
+    log_format: str = "json"
+
+
+# Singleton — import this everywhere
+settings = Settings()
