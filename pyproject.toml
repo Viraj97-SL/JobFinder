@@ -45,6 +45,10 @@ dependencies = [
     # ── Logging ──
     "structlog>=23.2.0",
 
+    # ── ML Pre-screening Gate ──
+    "sentence-transformers>=3.0.0",   # SBERT dense embeddings (all-MiniLM-L6-v2)
+    "rank-bm25>=0.2.2",               # BM25 sparse retrieval (Okapi BM25)
+
     # ── PDF Text Extraction (for hallucination validation) ──
     "pdfplumber>=0.10.0",
 

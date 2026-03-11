@@ -95,6 +95,9 @@ class PipelineSettings(BaseSettings):
     max_cvs_per_run: int = 20          # Only tailor top-N by score; all jobs still in Excel
     matchmaker_concurrency: int = 15   # Parallel Gemini Flash calls
     tailor_concurrency: int = 5        # Parallel Gemini Pro calls
+    # ML pre-screen gate (runs before LLM, cuts ~50% of calls)
+    ml_prescreen_enabled: bool = True
+    ml_prescreen_threshold: float = 0.30  # Weighted ensemble cutoff [0, 1]
 
 
 class EmailSettings(BaseSettings):

@@ -8,8 +8,9 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-# Run daily at 07:00 UTC (adjust to your timezone)
-cronSchedule = "0 7 * * *"
+# Run every Wednesday at 07:00 UTC
+# Wed = peak UK job market: Mon/Tue postings are indexed, mid-week response rates highest
+cronSchedule = "0 7 * * 3"
 startCommand = "python scripts/run_pipeline.py"
 restartPolicyType = "never"
 

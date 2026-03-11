@@ -31,5 +31,8 @@ RUN mkdir -p data outputs/cvs
 # Extract skill inventory from master CV templates
 RUN python scripts/extract_skill_inventory.py || echo "[WARN] Skill inventory extraction skipped"
 
+# Pre-download SBERT model into image cache (avoids cold-start download on Railway)
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+
 # Default: run the full pipeline (Railway overrides this with cron)
 CMD ["python", "scripts/run_pipeline.py"]

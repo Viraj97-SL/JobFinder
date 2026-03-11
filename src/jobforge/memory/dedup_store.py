@@ -221,7 +221,7 @@ class ScoreCache:
     Reduces Gemini Flash calls by ~30-50% on repeat scrapes.
     """
 
-    TTL_DAYS = 7
+    TTL_DAYS = 14  # 2 weeks — covers weekly run cadence + buffer
 
     def __init__(self) -> None:
         self.conn = get_connection()

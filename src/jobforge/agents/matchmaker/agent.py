@@ -67,18 +67,50 @@ class MatchmakerAgent(DeepAgent):
         }
 
     async def execute(self, state: JobForgeState, plan: dict[str, Any]) -> dict[str, Any]:
-        """Score all jobs in parallel using dual-pass architecture with score caching."""
+        """
+        Score jobs using a two-pass architecture:
+          Pass 1 (ML gate)  — dense + sparse + exact signals filter obvious non-matches
+          Pass 2 (LLM)      — Gemini Flash scores only what passed the gate, in parallel
+        """
         from langchain_google_genai import ChatGoogleGenerativeAI
 
         from jobforge.memory.dedup_store import ScoreCache
+        from jobforge.ml.prescreen import MLPrescreen
 
         jobs: list[RawJob] = plan["jobs"]
         skill_inventory = plan["skill_inventory"]
 
         if not jobs:
-            return {"scored_jobs": [], "qualified_jobs": []}
+            return {"scored_jobs": [], "qualified_jobs": [], "prescreened_count": 0}
 
-        # Create LLM and cache once for the entire batch
+        # ── Pass 1: ML pre-screen gate ──
+        to_llm: list[RawJob] = jobs
+        if settings.pipeline.ml_prescreen_enabled and skill_inventory is not None:
+            screen = MLPrescreen(skill_inventory, threshold=settings.pipeline.ml_prescreen_threshold)
+            screen.fit_bm25(jobs)  # one vectorised BM25 fit across all jobs
+
+            to_llm = []
+            for job in jobs:
+                passed, breakdown = screen.should_llm(job)
+                if passed:
+                    to_llm.append(job)
+                else:
+                    logger.debug(
+                        "matchmaker.prescreen.filtered",
+                        job_id=job.job_id,
+                        title=job.title,
+                        **breakdown,
+                    )
+
+            logger.info(
+                "matchmaker.prescreen.done",
+                total=len(jobs),
+                passed=len(to_llm),
+                filtered=len(jobs) - len(to_llm),
+                filter_rate=f"{(len(jobs) - len(to_llm)) / len(jobs):.0%}",
+            )
+
+        # ── Pass 2: LLM scoring (parallel, with score cache) ──
         llm = ChatGoogleGenerativeAI(
             model=settings.llm.fast_model,
             google_api_key=settings.llm.gemini_api_key,
@@ -86,7 +118,6 @@ class MatchmakerAgent(DeepAgent):
         )
         cache = ScoreCache()
         cache.evict_expired()
-
         semaphore = asyncio.Semaphore(settings.pipeline.matchmaker_concurrency)
 
         async def score_with_semaphore(job: RawJob) -> ScoredJob | None:
@@ -98,14 +129,18 @@ class MatchmakerAgent(DeepAgent):
                     logger.error("matchmaker.score.error", job_id=job.job_id, error=str(e))
                     return None
 
-        results = await asyncio.gather(*[score_with_semaphore(j) for j in jobs])
+        results = await asyncio.gather(*[score_with_semaphore(j) for j in to_llm])
         cache.close()
 
         scored: list[ScoredJob] = [r for r in results if r is not None]
         qualified = [s for s in scored if s.overall_score >= self.threshold]
         qualified.sort(key=lambda s: s.overall_score, reverse=True)
 
-        return {"scored_jobs": scored, "qualified_jobs": qualified}
+        return {
+            "scored_jobs": scored,
+            "qualified_jobs": qualified,
+            "prescreened_count": len(to_llm),
+        }
 
     async def reflect(self, state: JobForgeState, result: dict[str, Any]) -> dict[str, Any]:
         """Check score distribution for anomalies."""
@@ -181,6 +216,7 @@ class MatchmakerAgent(DeepAgent):
         summary = MatchSummary(
             total_scraped=len(state.get("raw_jobs", [])),
             total_after_dedup=len(state.get("deduped_jobs", [])),
+            total_prescreened=result.get("prescreened_count", len(scored)),
             total_scored=len(scored),
             total_qualified=len(qualified),
             average_score=round(sum(scores) / len(scores), 1) if scores else 0,
