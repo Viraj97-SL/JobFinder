@@ -88,7 +88,7 @@ class ScoredJob(BaseModel):
     )
 
     # ── Tailor Routing ──
-    recommended_cv_variant: Literal["ai_engineer", "data_scientist", "data_engineer"] = "ai_engineer"
+    recommended_cv_variant: Literal["ai_engineer", "data_scientist", "ml_engineer"] = "ai_engineer"
 
     @computed_field
     @property

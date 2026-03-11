@@ -35,7 +35,7 @@ class MatchScore(BaseModel):
     key_gaps: list[str] = Field(default_factory=list)
     transferable_highlights: list[str] = Field(default_factory=list)
     recommended_cv_variant: str = Field(
-        pattern=r"^(ai_engineer|data_scientist|data_engineer)$"
+        pattern=r"^(ai_engineer|data_scientist|ml_engineer)$"
     )
 
 

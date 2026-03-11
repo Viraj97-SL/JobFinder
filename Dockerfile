@@ -1,16 +1,17 @@
 # ╔══════════════════════════════════════════════════════════════╗
 # ║  JobForge AI — Production Dockerfile                        ║
-# ║  Multi-stage build with TeX Live for CV compilation         ║
+# ║  texlive for pdflatex CV compilation                        ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 FROM python:3.11-slim AS base
 
-# System dependencies
+# System dependencies (texlive for pdflatex + fontawesome5)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     texlive-base \
     texlive-latex-extra \
     texlive-fonts-recommended \
     texlive-fonts-extra \
+    texlive-xetex \
     latexmk \
     git \
     curl \
@@ -18,18 +19,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install Python dependencies
+# Install Python dependencies (production only)
 COPY pyproject.toml ./
-RUN pip install --no-cache-dir -e ".[dev]"
+RUN pip install --no-cache-dir -e .
 
-# Copy application code
+# Copy application code and data
 COPY . .
 
 # Create output directories
-RUN mkdir -p data outputs
+RUN mkdir -p data outputs/cvs
 
-# Extract skill inventory on build
-RUN python scripts/extract_skill_inventory.py
+# Extract skill inventory from master CV templates
+RUN python scripts/extract_skill_inventory.py || echo "[WARN] Skill inventory extraction skipped — run manually or ensure .tex files are present"
 
-# Default: run the full pipeline
+# Default: run the full pipeline (Railway overrides this with cron)
 CMD ["python", "scripts/run_pipeline.py"]

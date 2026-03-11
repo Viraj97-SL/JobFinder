@@ -39,7 +39,7 @@ TRANSFERABLE SKILLS MAPPING:
 CV VARIANT RECOMMENDATION:
 - "ai_engineer": Default for roles mentioning agents, LLMs, LangGraph, production AI
 - "data_scientist": For roles focused on statistics, ML models, research, analytics
-- "data_engineer": For roles focused on pipelines, ETL, backend, data infrastructure
+- "ml_engineer": For roles focused on ML pipelines, model training, MLOps, deployment
 
 You MUST respond with ONLY a valid JSON object matching the MatchScore schema.
 No preamble, no markdown, no explanation outside the JSON."""
@@ -69,5 +69,5 @@ Respond with ONLY a JSON object with these exact keys:
 - key_matching_skills (list of strings, top 5-7 matched skills)
 - key_gaps (list of strings, skills JD wants but candidate lacks)
 - transferable_highlights (list of strings, cross-domain strengths to emphasise)
-- recommended_cv_variant (string: "ai_engineer" or "data_scientist" or "data_engineer")
+- recommended_cv_variant (string: "ai_engineer" or "data_scientist" or "ml_engineer")
 """

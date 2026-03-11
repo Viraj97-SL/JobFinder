@@ -1,0 +1,143 @@
+\documentclass[a4paper,10pt]{article}
+
+% === PACKAGE IMPORTS ===
+\usepackage[a4paper, margin=0.75in]{geometry} % Set page margins
+\usepackage{enumitem}                          % For custom lists
+\usepackage[hidelinks]{hyperref}               % For clickable links (email, web)
+\usepackage{xcolor}                            % For custom colors
+\usepackage{url}
+\usepackage{fontawesome5}                      % For formatting URLs
+
+% === DOCUMENT SETUP ===
+\pagestyle{empty}                              % No page numbers
+\setlength{\parindent}{0pt}                    % No paragraph indentation
+\urlstyle{same}                                % Make URL font the same as body text
+
+% === CUSTOM COMMANDS ===
+% Define a color for section headings
+\definecolor{heading}{HTML}{2E86C1}
+
+% Command for a section break (Title + Horizontal Rule)
+\newcommand{\sect}[1]{\vspace{8pt}\noindent\textbf{\color{heading}\large #1}\vspace{3pt}\hrule\vspace{6pt}}
+
+% === DOCUMENT START ===
+\begin{document}
+
+% === HEADER ===
+\begin{center}
+  {\LARGE \textbf{Viraj Bulugahapitiya}} \\
+  18/A, Lytton Road, New Barnet, EN5 5BY \\
+  \href{mailto:amanthavirajavb@gmail.com}{\faEnvelope\;amanthavirajavb@gmail.com} \quad
+  \href{https://linkedin.com/in/viraj97}{\faLinkedin\;linkedin.com/in/viraj97} \quad
+  \href{https://github.com/Viraj97-SL}{\faGithub\;github.com/Viraj97-SL}
+\end{center}
+
+% === PROFESSIONAL SUMMARY ===
+\sect{Professional Summary}
+Results-oriented Machine Learning Engineer with an MSc in Data Science and hands-on expertise in building, optimizing, and deploying end-to-end ML pipelines. Highly proficient in PyTorch, XGBoost, and modern MLOps frameworks, with a strong background in deep learning, predictive modelling, and computer vision. Proven track record of developing research-grade AI solutions—including a 3D Swin Transformer for medical imaging and a production-ready sports analytics engine—while ensuring robust backend deployment via FastAPI, Docker, and cloud infrastructure. Adept at translating complex data into actionable insights and scalable machine learning systems.
+
+% === TECHNICAL SKILLS ===
+\sect{Technical Skills}
+\begin{itemize}[leftmargin=*, itemsep=2pt, topsep=2pt]
+    \item \textbf{Machine \& Deep Learning:} PyTorch, TensorFlow, XGBoost, scikit-learn, Ensemble Methods, Genetic Algorithms (DEAP), SHAP (Model Explainability), 3D Swin Transformers, LSTM.
+    \item \textbf{MLOps \& Data Engineering:} Python, SQL, Pandas, NumPy, Docker, Git/GitHub Actions (CI/CD), PostgreSQL, SQLite, REST APIs.
+    \item \textbf{Cloud \& Backend Deployment:} FastAPI, Azure, GCP, Railway, Architecture design.
+    \item \textbf{GenAI \& Computer Vision:} OpenCV, YOLOv8, HuggingFace, OCR, Google Gemini, Llama-3, LangGraph/LangChain, RAG.
+\end{itemize}
+
+% === PROJECTS & RESEARCH ===
+\sect{Projects \& Research}
+
+% --- Project 1 ---
+\noindent\textbf{CricOracle 2026: ML Match \& Score Predictor} \hfill \textit{Production ML Pipeline}
+\begin{itemize}[leftmargin=*, topsep=4pt, itemsep=2pt]
+    \item Developed a predictive analytics platform processing 565,377 records to forecast match probabilities and first-innings scores for the ICC T20 World Cup.
+    \item Trained \textbf{XGBoost} models utilizing permutation augmentation to eliminate team-ordering bias, achieving a leakage-free AUC of 0.887, calibrated via Platt Scaling.
+    \item Designed a \textbf{Genetic Algorithm (DEAP)} to autonomously optimize 11-player squads based on venue constraints, opponent strength, and sub-continent conditions.
+    \item Deployed the inference engine via a \textbf{FastAPI} backend, integrating \textbf{SHAP TreeExplainer} to deliver transparent, human-readable key prediction factors.
+\end{itemize}
+\textit{Technologies: Python, XGBoost, PyTorch (LSTM), scikit-learn, SHAP, DEAP, FastAPI, Pandas}
+\vspace{8pt}
+
+% --- Project 2 ---
+\noindent\textbf{Early Detection of Alzheimer’s Disease} \hfill \textit{MSc Research Project}
+\begin{itemize}[leftmargin=*, topsep=4pt, itemsep=2pt]
+    \item Developed a synergistic tri-modal framework integrating 3D MRI scans, longitudinal clinical data, and biomarker sequences from the ADNI dataset (N=187).
+    \item Pre-trained a \textbf{3D Swin Transformer} utilizing Self-Supervised contrastive learning (SimCLR-style) to learn robust brain anatomy representations and mitigate data scarcity.
+    \item Implemented dual \textbf{LSTM networks} for sequential data modeling, integrated via a dynamic gated fusion mechanism to adaptively weigh modalities per patient.
+    \item Solved severe class imbalance, achieving Accuracy = 89.66\%, AUC-ROC = 0.9611, MCC = 0.8337, and G-Mean = 0.9129 on a complex three-class classification task.
+\end{itemize}
+\textit{Technologies: Python, PyTorch, ANTsPy, NiBabel, scikit-learn, MONAI, GCP}
+\vspace{8pt}
+
+% --- Project 3 ---
+\noindent\textbf{RepoSentinel: AI/ML Learning Hub Curation Pipeline} \hfill \textit{Autonomous Data Pipeline}
+\begin{itemize}[leftmargin=*, topsep=4pt, itemsep=2pt]
+    \item Architected a directed acyclic graph (DAG) pipeline that autonomously crawls APIs (Tavily, arXiv, YouTube) to fill content gaps in an open-source Data Science repository.
+    \item Engineered a multi-stage validation gate to enforce Markdown formatting, link HTTP validity, Python syntax, and deduplication before ingestion.
+    \item Integrated a Human-in-the-loop (HITL) approval mechanism, triggering automated GitHub branching and Pull Request creation via PyGithub upon authorization.
+\end{itemize}
+\textit{Technologies: Python, LangGraph, PostgreSQL, PyGithub, APIs, Docker}
+\vspace{8pt}
+
+% --- Project 4 ---
+\noindent\textbf{VisionAID: Assistive AI System} \hfill \textit{Edge AI \& Computer Vision}
+\begin{itemize}[leftmargin=*, topsep=4pt, itemsep=2pt]
+    \item Engineered an edge-optimized AI system for visually impaired users, minimizing latency for execution on low-power devices like Raspberry Pi.
+    \item Integrated real-time computer vision modules leveraging \textbf{YOLOv8} for object detection, Tesseract for OCR, and HuggingFace transformers for emotion recognition.
+    \item Orchestrated vision and navigation tasks using a lightweight Message Control Protocol (MCP), logging state to SQLite. \textit{Winner: Agentic AI Competition}.
+\end{itemize}
+\textit{Technologies: Python, OpenCV, YOLOv8, OpenAI Whisper, Tesseract, HuggingFace, SQLite}
+
+% === EDUCATION ===
+\sect{Education}
+\noindent\textbf{MSc in Data Science} \hfill \textit{Completed, Sep 2025} \\
+\textit{University of Hertfordshire, UK}
+\begin{itemize}[leftmargin=*, topsep=2pt, itemsep=0pt]
+    \item Modules: Machine Learning, Deep Learning, Neural Networks, Statistical Modelling, Data Mining.
+\end{itemize}
+\vspace{4pt}
+
+\noindent\textbf{Diploma in Data Science} \hfill \textit{Apr 2023 – Apr 2024} \\
+\textit{NIBM, Sri Lanka}
+\vspace{4pt}
+
+\noindent\textbf{BSc in Logistics Management} \hfill \textit{Oct 2017 – Oct 2021} \\
+\textit{Dalian Maritime University, China}
+
+% === WORK EXPERIENCE ===
+\sect{Work Experience}
+\noindent\textbf{Customer Assistant} \hfill \textit{Feb 2025 – Present} \\
+\textit{Marks and Spencer, London, UK}
+\begin{itemize}[leftmargin=*, topsep=2pt, itemsep=1pt]
+    \item Ensure operational accuracy across stock level management, inventory audits, and digital Point-of-Sale (PoS) systems in a high-volume retail environment.
+\end{itemize}
+\vspace{4pt}
+
+\noindent\textbf{Executive – Planning (Operations \& Data)} \hfill \textit{May 2022 – Sep 2024} \\
+\textit{MAS Holdings, Sri Lanka}
+\begin{itemize}[leftmargin=*, topsep=2pt, itemsep=1pt]
+    \item Driven capacity utilization to 97\% and boosted on-time delivery rates to 95\% through proactive, data-driven cross-functional planning.
+    \item Built and maintained Power BI dashboards for real-time KPI tracking, translating complex operational data into actionable insights for senior stakeholders.
+\end{itemize}
+\vspace{4pt}
+
+\noindent\textbf{Trainee – Planning} \hfill \textit{Dec 2020 – Jul 2021} \\
+\textit{Colombo International Container Terminals (CICT), Sri Lanka}
+\begin{itemize}[leftmargin=*, topsep=2pt, itemsep=1pt]
+    \item Monitored key terminal throughput metrics to identify bottlenecks and utilized SAP ERP for resource allocation and yard optimization tasks.
+\end{itemize}
+
+% === LEADERSHIP & VOLUNTEERING ===
+\sect{Leadership \& Volunteering}
+\begin{itemize}[leftmargin=*, itemsep=2pt, topsep=2pt]
+    \item \textbf{Volunteer Data Scientist}, DataKind UK (Aug 2025 – Present)
+    \item \textbf{Mentor (AI Engineering)}, Teens in AI, UK (Feb 2026)
+    \item \textbf{Volunteer}, The Felix Project, UK (2024 – Present)
+\end{itemize}
+
+% === REFERENCES ===
+\sect{References}
+Available upon request.
+
+\end{document}

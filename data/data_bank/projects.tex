@@ -1,0 +1,134 @@
+\documentclass[a4paper,10pt]{article}
+
+% === PACKAGE IMPORTS ===
+\usepackage[a4paper, margin=0.75in]{geometry} % Set page margins
+\usepackage{enumitem}                         % For custom lists
+\usepackage[hidelinks]{hyperref}              % For clickable links (email, web)
+\usepackage{xcolor}                           % For custom colors
+\usepackage{url}
+\usepackage{fontawesome5}                     % For formatting URLs
+
+% === DOCUMENT SETUP ===
+\pagestyle{empty}                             % No page numbers
+\setlength{\parindent}{0pt}                   % No paragraph indentation
+\urlstyle{same}                               % Make URL font the same as body text
+
+% === CUSTOM COMMANDS ===
+% Define a color for section headings
+\definecolor{heading}{HTML}{2E86C1}
+
+% Command for a section break (Title + Horizontal Rule)
+\newcommand{\sect}[1]{\vspace{8pt}\noindent\textbf{\color{heading}\large #1}\vspace{3pt}\hrule\vspace{6pt}}
+
+% === DOCUMENT START ===
+\begin{document}
+
+% ==========================================
+%  BROADER TECHNICAL SKILLS (Pick & Choose)
+% ==========================================
+\sect{Technical Skills}
+\begin{itemize}[leftmargin=*, itemsep=0pt, parsep=0pt, topsep=2pt]
+    % Best for AI Engineer roles:
+    \item \textbf{GenAI \& Agentic AI:} LangGraph, LangChain, Multi-Agent Systems (Supervisor-Worker, Orchestrator), RAG, Model Context Protocol (MCP), Prompt Engineering.
+    \item \textbf{LLMs \& Vision:} Google Gemini (2.0 Flash/2.5 Pro), Llama-3, OpenAI Whisper, YOLOv8, OpenCV, HuggingFace, OCR (Tesseract).
+    % Best for ML Engineer roles:
+    \item \textbf{Machine Learning:} XGBoost, scikit-learn, Ensemble Methods, Genetic Algorithms (DEAP), SHAP (Model Explainability), Time Series Forecasting.
+    \item \textbf{Deep Learning:} PyTorch, TensorFlow, 3D Swin Transformers, LSTM, Self-Supervised Learning (SSL).
+    % Best for Data Scientist roles:
+    \item \textbf{Data Analytics \& Stats:} Python, R, Pandas, NumPy, SQL, Power BI, Statistical Calibration (Platt Scaling), A/B Testing, Feature Engineering.
+    % Universal Backend/Cloud skills:
+    \item \textbf{Backend \& Cloud Engineering:} FastAPI, Docker, PostgreSQL, SQLite, Git/GitHub Actions (CI/CD), Railway, Azure, GCP, REST APIs.
+\end{itemize}
+
+
+% ==========================================
+%  PROJECT BANK (Mix and match for the role)
+% ==========================================
+% === PROJECTS & RESEARCH ===
+\sect{Projects \& Research}
+
+% --- PROJECT: JobForge AI (Best for: AI/ML Engineer, Automation) ---
+\noindent\textbf{JobForge AI – Autonomous Multi-Agent Job Hunting Pipeline} \hfill \textit{AI Engineering}
+\begin{itemize}[leftmargin=*, topsep=4pt, itemsep=2pt]
+    \item Engineered an autonomous \textbf{LangGraph} multi-agent pipeline (Scout, Matchmaker, Tailor) to discover, evaluate, and tailor applications for UK data science roles.
+    \item Implemented a Deep Agent architecture featuring hierarchical planning, persistent deduplication memory via \textbf{SQLite}, and self-reflective evaluation loops.
+    \item Designed a dual-pass scoring engine (embedding similarity pre-screen + \textbf{Gemini 2.5 Pro} structured evaluation) to rank roles against a master CV.
+    \item Built a strict hallucination-free Tailor Agent that modifies LaTeX CV variants based solely on a ground-truth Skill Inventory JSON, compiling final PDFs automatically.
+\end{itemize}
+\textit{Technologies: Python, LangGraph, Gemini 2.5 Pro, SQLite, Pandas, pdflatex, Pydantic}
+\vspace{8pt}
+
+% --- PROJECT: Pamorya (Best for: AI Engineer, Full-Stack/Backend) ---
+\noindent\textbf{Pamorya AI Commerce Assistant} \hfill \textit{Multi-Agent System}
+\begin{itemize}[leftmargin=*, topsep=4pt, itemsep=2pt]
+    \item Developed a \textbf{LangGraph} multi-agent system utilizing a Supervisor-Worker architecture to intelligently route customer intents to specialized sales, inventory, and support agents.
+    \item Connected a Data Query Agent to a \textbf{PostgreSQL} database via Model Context Protocol (MCP) for real-time stock filtering and automated product categorization.
+    \item Eliminated LLM hallucinations on policy questions by integrating a \textbf{Retrieval-Augmented Generation (RAG)} agent backed by vector embeddings.
+    \item Built a resilient \textbf{FastAPI} backend featuring auto-retry logic to handle database locks and manage complex transactional reasoning loops during high traffic.
+\end{itemize}
+\textit{Technologies: Python, LangGraph, FastAPI, Gemini 2.0 Flash/Pro, PostgreSQL, MCP, RAG}
+\vspace{8pt}
+
+% --- PROJECT: RepoSentinel (Best for: AI Engineer, Data Engineer, MLOps) ---
+\noindent\textbf{RepoSentinel: AI/ML Learning Hub Curation Agent} \hfill \textit{Autonomous Pipeline}
+\begin{itemize}[leftmargin=*, topsep=4pt, itemsep=2pt]
+    \item Architected a directed acyclic graph (DAG) pipeline that autonomously crawls Tavily, arXiv, and YouTube to fill content gaps in an open-source Data Science curriculum repository.
+    \item Engineered a 5-check \textbf{Quality Assurance validation gate} (checking Markdown formatting, link HTTP validity, Python syntax, and duplication) utilizing \textbf{Gemini 2.5 Pro}.
+    \item Integrated a \textbf{Human-in-the-loop (HITL)} email approval mechanism via SMTP, triggering automated GitHub branching and Pull Request creation via PyGithub upon authorization.
+\end{itemize}
+\textit{Technologies: Python, LangGraph, Gemini 2.5 Pro, PostgreSQL, PyGithub, Tavily API, Docker}
+\vspace{8pt}
+
+% --- PROJECT: CricOracle 2026 (Best for: ML Engineer, Data Scientist) ---
+\noindent\textbf{CricOracle 2026: ML Match \& Score Predictor} \hfill \textit{Production ML Pipeline}
+\begin{itemize}[leftmargin=*, topsep=4pt, itemsep=2pt]
+    \item Developed a cricket analytics platform processing 565,377 ball-by-ball records to predict match probabilities and first-innings scores for the ICC T20 World Cup.
+    \item Trained \textbf{XGBoost} models utilizing permutation augmentation to eliminate team-ordering bias, achieving a leakage-free AUC of 0.887, calibrated via Platt Scaling.
+    \item Designed a \textbf{Genetic Algorithm (DEAP)} to autonomously optimize 11-player squads based on venue constraints, opponent strength, and sub-continent conditions.
+    \item Deployed the inference engine via a \textbf{FastAPI} backend, integrating \textbf{SHAP TreeExplainer} to deliver transparent, human-readable key prediction factors to the frontend.
+\end{itemize}
+\textit{Technologies: Python, XGBoost, PyTorch (LSTM), scikit-learn, SHAP, DEAP, FastAPI, Pandas}
+\vspace{8pt}
+
+% --- PROJECT: Alzheimer's Diagnosis (Best for: Data Scientist, Deep Learning) ---
+\noindent\textbf{Early Detection of Alzheimer’s Disease} \hfill \textit{MSc Research Project}
+\begin{itemize}[leftmargin=*, topsep=4pt, itemsep=2pt]
+    \item Developed a synergistic tri-modal framework integrating 3D MRI scans, longitudinal clinical data, and biomarker sequences from the ADNI dataset (N=187).
+    \item Pre-trained a \textbf{3D Swin Transformer} utilizing Self-Supervised contrastive learning (SimCLR-style) to learn robust brain anatomy representations and mitigate data scarcity.
+    \item Implemented dual \textbf{LSTM networks} for sequential data modeling, integrated via a dynamic gated fusion mechanism to adaptively weigh modalities per patient.
+    \item Solved severe class imbalance, achieving Accuracy = 89.66\%, AUC-ROC = 0.9611, MCC = 0.8337, and G-Mean = 0.9129 on a complex three-class classification task.
+\end{itemize}
+\textit{Technologies: Python, PyTorch, ANTsPy, NiBabel, scikit-learn, MONAI, imbalanced-learn}
+\vspace{8pt}
+
+% --- PROJECT: AI News Analyst (Best for: AI Engineer, Full-Stack AI) ---
+\noindent\textbf{Autonomous AI News \& Research Analyst} \hfill \textit{Dual-Pipeline AI System}
+\begin{itemize}[leftmargin=*, topsep=4pt, itemsep=2pt]
+    \item Architected completely isolated dual-brain \textbf{LangGraph} state machines to independently aggregate daily news and deeply analyze complex ArXiv academic papers.
+    \item Utilized \textbf{Gemini 2.5 Pro} as a technical Principal Investigator agent to dynamically extract core problems, methodologies, and limitations from dense literature.
+    \item Automated the generation of cyberpunk-themed visual diagnostic grids using a headless Chromium browser (html2image) and CSS for social media distribution.
+    \item Orchestrated cron-triggered \textbf{Railway Cloud} deployments featuring persistent PostgreSQL state tracking and secure HMAC-signed JWT email approvals for publishing.
+\end{itemize}
+\textit{Technologies: Python, LangGraph, Gemini 2.5 Pro/Flash, FastAPI, PostgreSQL, html2image, ArXiv API}
+\vspace{8pt}
+
+% --- PROJECT: VisionAID (Best for: Edge AI, Computer Vision) ---
+\noindent\textbf{VisionAID: Assistive AI System} \hfill \textit{Offline Edge AI}
+\begin{itemize}[leftmargin=*, topsep=4pt, itemsep=2pt]
+    \item Engineered a multi-agent assistive system for visually impaired users, optimized for offline execution on low-power devices like Raspberry Pi.
+    \item Integrated real-time computer vision modules leveraging \textbf{YOLOv8} for object detection, Tesseract/EasyOCR for documents, and HuggingFace transformers for emotion recognition.
+    \item Coordinated Navigation, Vision, and Ecommerce agents using a lightweight, custom Message Control Protocol (MCP), logging all interactions to a local SQLite database.
+\end{itemize}
+\textit{Technologies: Python, OpenCV, YOLOv8, OpenAI Whisper, Tesseract, HuggingFace, SQLite}
+\vspace{8pt}
+
+% --- PROJECT: SATH-CHAKRA AI (Best for: GenAI, Full-Stack) ---
+\noindent\textbf{SATH-CHAKRA AI | PROTOCOL-2026} \hfill \textit{Agentic Identity Engine}
+\begin{itemize}[leftmargin=*, topsep=4pt, itemsep=2pt]
+    \item Built a high-performance \textbf{LangGraph} state-machine orchestrating \textbf{Groq Llama-3.3-70B} for deep psychological gap analysis and identity archetype assignment.
+    \item Engineered a server-side \textbf{Playwright} pipeline to render dynamic, data-driven Tailwind HTML templates into high-fidelity PNG artifacts and SVG power-stat bars.
+    \item Developed a \textbf{FastAPI} backend with asynchronous background tasks for generative mission statements and automated RFC-5545 `.ics` calendar generation.
+\end{itemize}
+\textit{Technologies: Python, LangGraph, FastAPI, Groq (Llama-3), Playwright, React, Tailwind}
+
+\end{document}

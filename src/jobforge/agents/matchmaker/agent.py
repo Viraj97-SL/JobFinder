@@ -153,6 +153,18 @@ class MatchmakerAgent(DeepAgent):
 
         # Build summary
         scores = [s.overall_score for s in scored] if scored else [0]
+
+        def _bucket(score: float) -> str:
+            if score >= 90: return "90-100"
+            if score >= 80: return "80-89"
+            if score >= 70: return "70-79"
+            if score >= 60: return "60-69"
+            return "below_60"
+
+        dist: dict[str, int] = {"90-100": 0, "80-89": 0, "70-79": 0, "60-69": 0, "below_60": 0}
+        for s in scored:
+            dist[_bucket(s.overall_score)] += 1
+
         summary = MatchSummary(
             total_scraped=len(state.get("raw_jobs", [])),
             total_after_dedup=len(state.get("deduped_jobs", [])),
@@ -161,6 +173,7 @@ class MatchmakerAgent(DeepAgent):
             average_score=round(sum(scores) / len(scores), 1) if scores else 0,
             highest_score=max(scores) if scores else 0,
             highest_score_company=qualified[0].job.company if qualified else "",
+            score_distribution=dist,
             sponsoring_jobs_count=sum(1 for s in qualified if s.job.offers_sponsorship),
             startup_jobs_count=sum(1 for s in qualified if s.job.is_startup),
         )
@@ -174,26 +187,72 @@ class MatchmakerAgent(DeepAgent):
     # ── PRIVATE ──
 
     async def _score_job(self, job: RawJob, skill_inventory: Any) -> ScoredJob | None:
-        """
-        Score a single job using Gemini Flash with structured JSON output.
+        """Score a single job using Gemini Flash with structured JSON output."""
+        import json as _json
 
-        TODO: Replace this stub with actual Gemini API call.
-        The prompt templates are in config/prompts/matchmaker.py.
-        """
-        # ─── INTEGRATION POINT ───
-        # In production, this calls:
-        #   from langchain_google_genai import ChatGoogleGenerativeAI
-        #   llm = ChatGoogleGenerativeAI(model=settings.llm.fast_model)
-        #   response = llm.invoke([system_msg, user_msg])
-        #   match_score = MatchScore.model_validate_json(response.content)
-        #
-        # For now, return a placeholder that demonstrates the pipeline flow.
-        # Replace this method body with real LLM integration in Phase 2.
+        from langchain_core.messages import HumanMessage, SystemMessage
+        from langchain_google_genai import ChatGoogleGenerativeAI
 
-        logger.debug("matchmaker.score.stub", job_id=job.job_id, title=job.title)
+        llm = ChatGoogleGenerativeAI(
+            model=settings.llm.fast_model,
+            google_api_key=settings.llm.gemini_api_key,
+            temperature=settings.llm.temperature,
+        )
 
-        # Placeholder — remove when integrating real LLM
-        return None
+        # Serialise skill inventory (or fallback placeholder)
+        if skill_inventory is not None:
+            inventory_json = skill_inventory.model_dump_json(indent=2)
+        else:
+            inventory_json = '{"note": "No skill inventory loaded — score based on job description alone."}'
+
+        user_content = MATCHMAKER_USER_TEMPLATE.format(
+            title=job.title,
+            company=job.company,
+            location=job.location,
+            salary=job.salary_display,
+            description=job.description[:4000],  # Guard against token overflow
+            skill_inventory_json=inventory_json,
+        )
+
+        messages = [
+            SystemMessage(content=MATCHMAKER_SYSTEM_PROMPT),
+            HumanMessage(content=user_content),
+        ]
+
+        response = await llm.ainvoke(messages)
+
+        # Strip markdown fences if model wraps in ```json
+        raw = response.content.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```", 2)[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.rsplit("```", 1)[0].strip()
+
+        match_score = MatchScore.model_validate(_json.loads(raw))
+
+        logger.debug(
+            "matchmaker.score.done",
+            job_id=job.job_id,
+            title=job.title,
+            overall=match_score.overall_score,
+        )
+
+        return ScoredJob(
+            job=job,
+            overall_score=match_score.overall_score,
+            technical_skills_score=match_score.technical_skills_score,
+            domain_experience_score=match_score.domain_experience_score,
+            seniority_fit_score=match_score.seniority_fit_score,
+            location_score=match_score.location_score,
+            visa_score=match_score.visa_score,
+            role_alignment_score=match_score.role_alignment_score,
+            reasoning=match_score.reasoning,
+            key_matching_skills=match_score.key_matching_skills,
+            key_gaps=match_score.key_gaps,
+            transferable_highlights=match_score.transferable_highlights,
+            recommended_cv_variant=match_score.recommended_cv_variant,
+        )
 
     def _apply_visa_adjustments(self, scored: ScoredJob) -> ScoredJob:
         """Apply PSW-specific visa score adjustments."""

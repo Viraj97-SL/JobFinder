@@ -1,0 +1,27 @@
+# ╔══════════════════════════════════════════════════════════════╗
+# ║  JobForge AI — Railway Deployment Config                    ║
+# ║  Single cron service — no separate web service needed       ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Run daily at 07:00 UTC (adjust to your timezone)
+cronSchedule = "0 7 * * *"
+startCommand = "python scripts/run_pipeline.py"
+restartPolicyType = "never"
+
+# Environment variables to set in Railway dashboard:
+# GEMINI_API_KEY         — Google Gemini API key
+# DATABASE_URL           — Auto-set by Railway PostgreSQL addon
+# ADZUNA_APP_ID          — Adzuna API id
+# ADZUNA_APP_KEY         — Adzuna API key
+# REED_API_KEY           — Reed API key
+# TAVILY_API_KEY         — Tavily search key
+# SMTP_USER              — Gmail address (or use Resend)
+# SMTP_PASSWORD          — Gmail app password (or use Resend)
+# RECIPIENT_EMAIL        — Where to send the daily digest
+# RESEND_API_KEY         — Alternative to SMTP (recommended)
+# EMAIL_FROM             — e.g. jobforge@yourdomain.com

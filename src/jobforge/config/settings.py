@@ -18,14 +18,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent  # jobforge-ai/
 DATA_DIR = ROOT_DIR / "data"
 OUTPUT_DIR = ROOT_DIR / "outputs"
+_ENV_FILE = str(ROOT_DIR / ".env")
 
 
 class LLMSettings(BaseSettings):
     """LLM provider configuration — swap models by changing env vars."""
 
-    model_config = SettingsConfigDict(env_prefix="LLM_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="LLM_", env_file=_ENV_FILE, extra="ignore")
 
-    gemini_api_key: str = Field(alias="GEMINI_API_KEY")
+    gemini_api_key: str = Field(validation_alias="GEMINI_API_KEY")
     fast_model: str = "gemini-2.0-flash"
     deep_model: str = "gemini-2.5-pro"
     cost_cap_usd: float = 2.00
@@ -35,7 +36,7 @@ class LLMSettings(BaseSettings):
 class JobSourceSettings(BaseSettings):
     """API keys and limits for each job source connector."""
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
     adzuna_app_id: str = ""
     adzuna_app_key: str = ""
@@ -61,7 +62,7 @@ class VisaSettings(BaseSettings):
     - Roles offering Skilled Worker Visa sponsorship get a scoring BOOST.
     """
 
-    model_config = SettingsConfigDict(env_prefix="VISA_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="VISA_", env_file=_ENV_FILE, extra="ignore")
 
     status: str = "psw_graduate_route"
     expiry_date: date = Field(default_factory=lambda: date(2027, 9, 1))
@@ -83,7 +84,7 @@ class VisaSettings(BaseSettings):
 class PipelineSettings(BaseSettings):
     """Pipeline-level thresholds and behaviour."""
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
     match_threshold: int = 70
     embedding_prescreen_threshold: float = 0.45
@@ -95,17 +96,17 @@ class PipelineSettings(BaseSettings):
 class EmailSettings(BaseSettings):
     """Email dispatch configuration — supports SMTP or Resend."""
 
-    model_config = SettingsConfigDict(env_prefix="SMTP_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="SMTP_", env_file=_ENV_FILE, extra="ignore")
 
     host: str = "smtp.gmail.com"
     port: int = 587
     user: str = ""
     password: str = ""
-    recipient_email: str = Field(default="", alias="RECIPIENT_EMAIL")
+    recipient_email: str = Field(default="", validation_alias="RECIPIENT_EMAIL")
 
     # Alternative: Resend
-    resend_api_key: str = Field(default="", alias="RESEND_API_KEY")
-    email_from: str = Field(default="", alias="EMAIL_FROM")
+    resend_api_key: str = Field(default="", validation_alias="RESEND_API_KEY")
+    email_from: str = Field(default="", validation_alias="EMAIL_FROM")
 
     @property
     def backend(self) -> Literal["smtp", "resend"]:
@@ -115,7 +116,7 @@ class EmailSettings(BaseSettings):
 class Settings(BaseSettings):
     """Master settings — aggregates all sub-configs."""
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
     llm: LLMSettings = Field(default_factory=LLMSettings)
     sources: JobSourceSettings = Field(default_factory=JobSourceSettings)
@@ -123,9 +124,24 @@ class Settings(BaseSettings):
     pipeline: PipelineSettings = Field(default_factory=PipelineSettings)
     email: EmailSettings = Field(default_factory=EmailSettings)
 
-    database_url: str = f"sqlite+aiosqlite:///{DATA_DIR / 'jobforge.db'}"
+    # Railway auto-sets DATABASE_URL as postgresql://... — we normalise it for asyncpg.
+    # Locally falls back to SQLite.
+    database_url: str = Field(
+        default=f"sqlite+aiosqlite:///{DATA_DIR / 'jobforge.db'}",
+        validation_alias="DATABASE_URL",
+    )
     log_level: str = "INFO"
     log_format: str = "json"
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalise_db_url(cls, v: str) -> str:
+        """Convert Railway's postgresql:// to postgresql+asyncpg:// for SQLAlchemy async."""
+        if v.startswith("postgresql://") or v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql+asyncpg://", 1).replace(
+                "postgresql://", "postgresql+asyncpg://", 1
+            )
+        return v
 
 
 # Singleton — import this everywhere

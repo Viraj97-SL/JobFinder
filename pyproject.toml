@@ -38,6 +38,7 @@ dependencies = [
 
     # ── Persistence ──
     "aiosqlite>=0.19.0",
+    "asyncpg>=0.29.0",
 
     # ── Email ──
     "resend>=2.0.0",

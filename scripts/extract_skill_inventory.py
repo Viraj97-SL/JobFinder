@@ -259,7 +259,7 @@ def main():
     with open(output_path, "w") as f:
         json.dump(inventory.model_dump(), f, indent=2)
 
-    print(f"Skill Inventory extracted → {output_path}")
+    print(f"Skill Inventory extracted -> {output_path}")
     print(f"  Skills categories:  {len(inventory.technical_skills)}")
     print(f"  Total skills:       {len(inventory.get_all_skills_flat())}")
     print(f"  Projects:           {len(inventory.projects)}")

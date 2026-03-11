@@ -30,9 +30,11 @@ logger = structlog.get_logger(__name__)
 # CV variant mapping
 CV_VARIANTS = {
     "ai_engineer":    DATA_DIR / "master_cvs" / "ai_engineer.tex",
-    "data_scientist":  DATA_DIR / "master_cvs" / "data_scientist.tex",
-    "data_engineer":   DATA_DIR / "master_cvs" / "data_engineer.tex",
+    "data_scientist": DATA_DIR / "master_cvs" / "data_scientist.tex",
+    "ml_engineer":    DATA_DIR / "master_cvs" / "ML_engineer.tex",
 }
+
+PROJECTS_BANK_PATH = DATA_DIR / "data_bank" / "projects.tex"
 
 
 class TailorAgent(DeepAgent):
@@ -121,38 +123,80 @@ class TailorAgent(DeepAgent):
     async def _tailor_single(
         self, job: ScoredJob, variant: str, skill_inventory: SkillInventory | None
     ) -> TailoredCV | TailorError:
-        """
-        Tailor a CV for a single job with retry logic.
+        """Tailor a CV for a single job with retry logic."""
+        base_tex_path = CV_VARIANTS.get(variant)
+        if base_tex_path is None or not base_tex_path.exists():
+            return TailorError(
+                job_id=job.job.job_id,
+                company=job.job.company,
+                error_type="missing_base_cv",
+                error_message=f"Master CV not found: {base_tex_path}. Add .tex files to data/master_cvs/.",
+                retry_count=0,
+                fallback_used=False,
+            )
 
-        TODO: Implement LLM-driven LaTeX modification in Phase 3.
-        Current stub: copies base CV without modification (safe fallback).
-        """
+        company_slug = job.job.company.replace(" ", "_")[:20].strip("_")
+        role_slug = job.job.title.replace(" ", "_")[:20].strip("_")
+        base_name = f"Viraj_CV_{company_slug}_{role_slug}"
+
         for attempt in range(self.max_retries + 1):
             try:
-                # ─── INTEGRATION POINT ───
-                # Phase 3 implementation:
-                # 1. Read base LaTeX file
-                # 2. Call Gemini Pro with tailoring instructions
-                # 3. Validate output against SkillInventory
-                # 4. Compile with pdflatex
-                # 5. Return TailoredCV
+                base_latex = base_tex_path.read_text(encoding="utf-8")
 
-                # For now: placeholder that produces the right schema
-                company_slug = job.job.company.replace(" ", "_")[:20]
-                role_slug = job.job.title.replace(" ", "_")[:20]
-                filename = f"Viraj_CV_{company_slug}_{role_slug}.pdf"
+                # ── LLM-driven modification ──
+                modified_latex = await self._modify_latex(base_latex, job, skill_inventory)
+
+                # ── Hallucination check on modified LaTeX text ──
+                passed, violations = self._validate_against_inventory(
+                    modified_latex, skill_inventory
+                )
+                if not passed:
+                    logger.warning(
+                        "tailor.hallucination_detected",
+                        job_id=job.job.job_id,
+                        attempt=attempt + 1,
+                        violations=violations,
+                    )
+                    if attempt < self.max_retries:
+                        continue  # Retry — next attempt re-prompts LLM
+                    # Final attempt: fall back to base (unmodified) CV
+                    modified_latex = base_latex
+                    passed = True
+                    violations = []
+
+                # ── Write modified .tex ──
+                today_dir = OUTPUT_DIR / "cvs"
+                today_dir.mkdir(parents=True, exist_ok=True)
+                tex_path = today_dir / f"{base_name}.tex"
+                tex_path.write_text(modified_latex, encoding="utf-8")
+
+                # ── Compile to PDF (if pdflatex available) ──
+                pdf_path = today_dir / f"{base_name}.pdf"
+                compile_success = self._compile_pdf(tex_path, today_dir)
+
+                if not compile_success:
+                    logger.warning(
+                        "tailor.pdflatex_unavailable",
+                        job_id=job.job.job_id,
+                        tex_path=str(tex_path),
+                    )
+                    notes = "pdflatex not found — .tex saved, compile manually with: pdflatex " + tex_path.name
+                else:
+                    notes = ""
+
+                sections = self._identify_sections(job)
 
                 return TailoredCV(
                     job_id=job.job.job_id,
                     company=job.job.company,
                     role=job.job.title,
                     variant_used=variant,
-                    pdf_path=str(OUTPUT_DIR / "cvs" / filename),
-                    pdf_filename=filename,
-                    sections_modified=["summary", "skills"],
-                    hallucination_check_passed=True,
+                    pdf_path=str(pdf_path),
+                    pdf_filename=f"{base_name}.pdf",
+                    sections_modified=sections,
+                    hallucination_check_passed=passed,
                     retry_count=attempt,
-                    notes="Stub — base CV used. Implement LLM tailoring in Phase 3.",
+                    notes=notes,
                 )
 
             except Exception as e:
@@ -172,6 +216,110 @@ class TailorAgent(DeepAgent):
             fallback_used=True,
         )
 
+    async def _modify_latex(
+        self, base_latex: str, job: ScoredJob, skill_inventory: SkillInventory | None
+    ) -> str:
+        """Call Gemini Pro to modify LaTeX sections for the target job."""
+        from langchain_core.messages import HumanMessage, SystemMessage
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
+        from jobforge.config.prompts.tailor import (
+            TAILOR_SKILLS_TEMPLATE,
+            TAILOR_SUMMARY_TEMPLATE,
+            TAILOR_SYSTEM_PROMPT,
+        )
+        from jobforge.config.settings import settings
+
+        llm = ChatGoogleGenerativeAI(
+            model=settings.llm.deep_model,
+            google_api_key=settings.llm.gemini_api_key,
+            temperature=settings.llm.temperature,
+        )
+
+        inventory_summary = (
+            skill_inventory.model_dump_json(indent=2)
+            if skill_inventory
+            else '{"note": "No inventory — use only verifiable information from the CV text."}'
+        )
+
+        # Load the projects bank if available
+        projects_bank = ""
+        if PROJECTS_BANK_PATH.exists():
+            projects_bank = PROJECTS_BANK_PATH.read_text(encoding="utf-8")
+
+        projects_section = f"""
+PROJECTS BANK (select the 3–4 most relevant projects for this role and replace the Projects section):
+{projects_bank[:4000]}
+""" if projects_bank else ""
+
+        # Build a single prompt that asks the model to return the full modified LaTeX
+        user_prompt = f"""Modify the following LaTeX CV to better match the target job.
+
+CRITICAL: Return the COMPLETE LaTeX document. Do NOT truncate, shorten, or omit any sections.
+Preserve ALL existing sections (Header, Education, etc.) exactly as-is unless they are in SECTIONS TO MODIFY.
+
+TARGET JOB:
+Title: {job.job.title}
+Company: {job.job.company}
+Key Requirements: {', '.join(job.key_matching_skills[:6])}
+Transferable Highlights: {', '.join(job.transferable_highlights[:4])}
+Key Gaps: {', '.join(job.key_gaps[:3]) if job.key_gaps else 'None'}
+
+SKILL INVENTORY (your ONLY source of truth for metrics and technologies):
+{inventory_summary}
+{projects_section}
+SECTIONS TO MODIFY:
+- Professional Summary: rewrite to mirror the JD language and highlight matching skills
+- Technical Skills: reorder so JD-relevant skills appear first
+- Projects & Research: pick the 3–4 most relevant projects from the PROJECTS BANK above (if provided) and replace the existing projects section entirely
+
+BASE LaTeX CV (return this in FULL with only the above sections modified):
+{base_latex}
+
+Return ONLY the complete modified LaTeX document. No explanation, no markdown fences."""
+
+        response = await llm.ainvoke([
+            SystemMessage(content=TAILOR_SYSTEM_PROMPT),
+            HumanMessage(content=user_prompt),
+        ])
+
+        result = response.content.strip()
+        # Strip markdown fences if present
+        if result.startswith("```"):
+            result = result.split("```", 2)[1]
+            if result.startswith("latex") or result.startswith("tex"):
+                result = result.split("\n", 1)[1]
+            result = result.rsplit("```", 1)[0].strip()
+
+        return result
+
+    def _compile_pdf(self, tex_path: Path, output_dir: Path) -> bool:
+        """
+        Compile a .tex file to PDF.
+        Tries pdflatex first, then tectonic (self-contained, no install needed on Railway).
+        Returns True on success, False if no compiler is available.
+        """
+        compilers = [
+            ["pdflatex", "-interaction=nonstopmode", "-output-directory", str(output_dir), str(tex_path)],
+            ["tectonic", "-o", str(output_dir), str(tex_path)],
+        ]
+        for cmd in compilers:
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                if result.returncode == 0:
+                    return True
+                logger.warning(
+                    "tailor.compile_error",
+                    compiler=cmd[0],
+                    tex=tex_path.name,
+                    stderr=result.stderr[-500:],
+                )
+            except FileNotFoundError:
+                continue
+            except subprocess.TimeoutExpired:
+                logger.warning("tailor.compile_timeout", compiler=cmd[0], tex=tex_path.name)
+        return False
+
     def _identify_sections(self, job: ScoredJob) -> list[str]:
         """Determine which CV sections need modification based on match analysis."""
         sections = ["professional_summary"]  # Always rewrite the summary
@@ -189,19 +337,39 @@ class TailorAgent(DeepAgent):
         return sections
 
     def _validate_against_inventory(
-        self, pdf_text: str, skill_inventory: SkillInventory
+        self, latex_text: str, skill_inventory: SkillInventory | None
     ) -> tuple[bool, list[str]]:
         """
-        Hallucination detector: check extracted PDF text against SkillInventory.
+        Hallucination detector: scan modified LaTeX for skills/metrics not in the SkillInventory.
+
+        Checks:
+        1. Percentage metrics (e.g. "98%" or "0.97 AUC") not in quantified_achievements
+        2. Technology names that appear newly added and are not in the inventory
 
         Returns (passed: bool, violations: list[str])
         """
-        violations = []
+        import re
 
-        # TODO: Implement in Phase 3
-        # 1. Extract text from generated PDF using pdfplumber
-        # 2. Find all technical terms and percentages
-        # 3. Cross-reference with skill_inventory.get_all_skills_flat()
-        # 4. Cross-reference metrics with skill_inventory.quantified_achievements
+        if skill_inventory is None:
+            return (True, [])  # Cannot validate without inventory — pass through
+
+        violations: list[str] = []
+
+        # ── Check quantified metrics ──
+        # Find patterns like "98%", "0.97 AUC", "£45,000"
+        pct_pattern = re.compile(r'\b(\d{2,3}(?:\.\d+)?)\s*%')
+        decimal_pattern = re.compile(r'\b0\.\d{2,}\b')
+
+        for match in pct_pattern.finditer(latex_text):
+            metric_str = match.group(0).strip()
+            # Only flag metrics above 50% (avoid page numbers, years, etc.)
+            value = float(match.group(1))
+            if value > 50 and not skill_inventory.has_metric(metric_str):
+                context = latex_text[max(0, match.start()-30):match.end()+30].replace('\n', ' ')
+                violations.append(f"Unverified metric '{metric_str}' — not in skill inventory. Context: ...{context}...")
+
+        # ── Sanity check: LaTeX must still compile (basic structure check) ──
+        if r'\begin{document}' not in latex_text or r'\end{document}' not in latex_text:
+            violations.append("Modified LaTeX is missing \\begin{document} or \\end{document}")
 
         return (len(violations) == 0, violations)

@@ -1,0 +1,154 @@
+\documentclass[a4paper,10pt]{article}
+
+% === PACKAGE IMPORTS ===
+\usepackage[a4paper, margin=0.75in]{geometry} % Set page margins
+\usepackage{enumitem}                         % For custom lists
+\usepackage[hidelinks]{hyperref}              % For clickable links (email, web)
+\usepackage{xcolor}                           % For custom colors
+\usepackage{url}
+\usepackage{fontawesome5}                     % For formatting URLs
+
+% === DOCUMENT SETUP ===
+\pagestyle{empty}                             % No page numbers
+\setlength{\parindent}{0pt}                   % No paragraph indentation
+\urlstyle{same}                               % Make URL font the same as body text
+
+% === CUSTOM COMMANDS ===
+% Define a color for section headings
+\definecolor{heading}{HTML}{2E86C1}
+
+% Command for a section break (Title + Horizontal Rule)
+\newcommand{\sect}[1]{\vspace{8pt}\noindent\textbf{\color{heading}\large #1}\vspace{3pt}\hrule\vspace{6pt}}
+
+% === DOCUMENT START ===
+\begin{document}
+
+% === HEADER ===
+\begin{center}
+  {\LARGE \textbf{Viraj Bulugahapititya}} \\
+  18/A, Lytton Road, New Barnet, EN5 5BY \\
+  \vspace{3pt}
+  \href{mailto:amanthavirajavb@gmail.com}{\faEnvelope\;amanthavirajavb@gmail.com} \quad
+  \href{https://linkedin.com/in/viraj97}{\faLinkedin\;linkedin.com/in/viraj97} \quad
+  \href{https://github.com/Viraj97-SL}{\faGithub\;github.com/Viraj97-SL} \quad
+  \href{https://viraj-bulugahapitiya.vercel.app}{\faGlobe\;viraj-bulugahapitiya.vercel.app}
+\end{center}
+
+% === PROFESSIONAL SUMMARY ===
+\sect{Professional Summary}
+Results oriented MSc Data Science graduate with hands-on expertise in machine learning, deep learning, and data engineering. Experienced in managing end-to-end data projects, from preprocessing large-scale imaging and text datasets to deploying advanced models on cloud platforms. Developed research-grade AI solutions, including a 3D Swin Transformer with Mixture-of-Experts for early Alzheimer’s detection and VisionAID, an award-winning multi-agent assistive AI system. Skilled in Python, SQL, PyTorch, TensorFlow, and modern AI frameworks, with proven ability to transform complex data into actionable insights. Recognized for problem solving, innovation, and cross-functional collaboration, and eager to apply technical and analytical expertise in real-world industry settings.
+
+% === EDUCATION ===
+\sect{Education}
+\noindent\textbf{MSc in Data Science} \hfill \textit{Completed, Sep 2025} \\
+\textit{University of Hertfordshire, UK}
+\begin{itemize}[leftmargin=*, topsep=2pt, itemsep=0pt]
+    \item Relevant Modules: Machine Learning, Data Mining, Neural Networks, Data Visualization, Applied Data Science, Fundamentals of Data Science
+\end{itemize}
+\vspace{4pt}
+
+\noindent\textbf{Diploma in Data Science} \hfill \textit{Apr 2023 – Apr 2024} \\
+\textit{NIBM, Sri Lanka}
+\vspace{4pt}
+
+\noindent\textbf{BSc in Logistics Management} \hfill \textit{Oct 2017 – Oct 2021} \\
+\textit{Dalian Maritime University, China}
+
+% === TECHNICAL SKILLS ===
+\sect{Technical Skills}
+\begin{itemize}[leftmargin=*, itemsep=2pt, topsep=2pt]
+    \item \textbf{GenAI \& Agentic Systems:} LangGraph, LangChain, Multi-Agent Systems (MAS), RAG, MCP, API, Vector Databases (Chroma/FAISS), Prompt Engineering.
+    \item \textbf{Programming Languages:} Python, SQL, R, JavaScript (React/Next.js).
+    \item \textbf{Backend \& Cloud Engineering:} FastAPI, Docker, Git/GitHub, Railway, Vercel, Azure, GCP, REST APIs.
+    \item \textbf{Machine Learning \& Vision:} PyTorch, TensorFlow, YOLOv8, OpenCV, scikit-learn, Computer Vision.
+    \item \textbf{Data \& Visualization:} SQLite, PostgreSQL, Pandas, NumPy, Power BI, Matplotlib, Seaborn.
+\end{itemize}
+
+% === PROJECTS & RESEARCH ===
+\sect{Projects \& Research}
+
+% --- Project 1 ---
+\noindent\textbf{Early Detection of Alzheimer’s Disease Using 3D Swin Transformer} \hfill \textit{MSc Thesis}
+\begin{itemize}[leftmargin=*, topsep=4pt, itemsep=2pt]
+    \item Developed a novel \textbf{tri-modal deep learning framework} for early Alzheimer’s Disease diagnosis, integrating 3D MRI scans, longitudinal clinical data, and biomarker sequences from the ADNI dataset (N=187).
+    \item Designed and pre-trained a \textbf{3D Swin Transformer} with a self-supervised contrastive learning strategy to mitigate data scarcity and model collapse in low-sample regimes.
+    \item Implemented dual \textbf{LSTM networks} to capture temporal patterns in cognitive assessments and biomarker sequences, enabling robust sequential modelling.
+    \item Engineered a \textbf{dynamic Gated Fusion mechanism} to adaptively weigh contributions from each modality, producing patient-specific, synergistic representations.
+    \item Achieved strong diagnostic performance on a three-class classification (CN, MCI, Dementia), with Accuracy = 89.66\%, AUC-ROC = 0.9611, MCC = 0.8337, and G-Mean = 0.9129, demonstrating balanced classification even under severe class imbalance.
+\end{itemize}
+
+\textit{Technologies: Python, PyTorch, ANTsPy, NiBabel, scikit-learn, Google Cloud, ADNI Dataset}
+
+\textit{GitHub: \url{https://github.com/Viraj97-SL/Research-Early-prediction-of-Alzheimer-s.git}}
+\vspace{8pt}
+
+% --- Project 2 ---
+\noindent\textbf{VisionAID – Assistive AI System} \hfill \textit{Winner, University of Hertfordshire Agentic AI Competition}
+\begin{itemize}[leftmargin=*, topsep=4pt, itemsep=2pt]
+    \item Designed and built an offline, agentic AI system for visually impaired users, leveraging LangChain and OpenCV to coordinate multiple AI tasks.
+    \item Integrated a suite of specialized modules, including YOLOv8 for real-time object detection, OCR for text reading, barcode scanning, emotion detection, and OpenAI's Whisper for voice command processing.
+    \item Orchestrated agent actions using a Multi-agent Control Protocol (MCP) and logged all system activities and results into a local SQLite database for reliability and debugging.
+\end{itemize}
+\textit{Technologies: Python, Artificial Intelligence, OpenCV, YOLOv8, Tesseract, Hugging Face, LangChain, SQLite, MCP protocol, gTTS, Whisper}
+
+\textit{GitHub: \url{https://github.com/Viraj97-SL/VisionAId}}
+\vspace{8pt}
+
+% --- Project 3 ---
+\noindent\textbf{GenAI Fashion Stylist \& Virtual Try-On Agent} \hfill \textit{Full-Stack AI Project}
+\begin{itemize}[leftmargin=*, topsep=4pt, itemsep=2pt]
+    \item Engineered a \textbf{Multi-Agent System (MAS)} using \textbf{LangGraph} and \textbf{LangChain} to orchestrate specialized agents (Sales, Inventory, Support) for a seamless retail experience.
+    \item Implemented \textbf{Retrieval-Augmented Generation (RAG)} with vector embeddings to deliver accurate, context-aware product details and return policies, significantly reducing LLM hallucinations.
+    \item Integrated a real-time \textbf{Virtual Try-On (VTO)} feature by connecting \textbf{Replicate’s IDM-VTON model} with a custom API, enabling users to visualize garments on uploaded photos.
+    \item Developed a scalable microservices architecture with a \textbf{FastAPI} backend and a responsive \textbf{Next.js} frontend, utilizing SQLite for dynamic inventory management.
+\end{itemize}
+\textit{Technologies: Python, LangGraph, LangChain, FastAPI, MCP, RAG, ChromaDB, Replicate API, Docker}
+
+\textit{GitHub: \url{https://github.com/Viraj97-SL/Multi-Agent-Apparel-Chatbot.git}}
+\vspace{8pt}
+
+% === WORK EXPERIENCE ===
+\sect{Work Experience}
+\noindent\textbf{Customer Assistant} \hfill \textit{Feb 2025 – Present} \\
+\textit{Marks and Spencer, London, UK}
+\begin{itemize}[leftmargin=*, topsep=2pt, itemsep=1pt]
+    \item Provide exceptional customer service by efficiently resolving inquiries and issues in a high-volume, fast-paced retail environment.
+    \item Ensure operational accuracy across stock level management, inventory audits, and digital Point-of-Sale (PoS) systems.
+    \item Proactively identified and resolved potential customer service issues, demonstrating strong problem-solving skills and a commitment to customer satisfaction.
+    \item Outstanding communication and interpersonal skills.
+\end{itemize}
+\vspace{4pt}
+
+\noindent\textbf{Executive – Planning} \hfill \textit{May 2022 – Sep 2024} \\
+\textit{MAS Holdings, Sri Lanka}
+\begin{itemize}[leftmargin=*, topsep=2pt, itemsep=1pt]
+    \item Drove significant improvements in operational efficiency and on-time delivery, achieving reduction in production delays and boosting on-time delivery rates upto 95\% through proactive cross-functional planning.
+    \item Optimized resource allocation and maximized plant capacity utilization to 97\%.
+    \item Generated and presented weekly KPI reports to senior stakeholders using advanced Excel functions and Power BI dashboards.
+    \item Enhanced supply chain resilience and responsiveness, leading to a reduction in work-in-progress (WIP) inventory.
+\end{itemize}
+\vspace{4pt}
+
+% === CERTIFICATIONS & AWARDS ===
+\sect{Certifications \& Awards}
+\begin{itemize}[leftmargin=*, itemsep=0pt, parsep=0pt, topsep=2pt]
+    \item \textbf{Certification:} AI Agents in LangGraph -- LangChain \& Tavily
+    \item \textbf{Certification:} Orchestrating Workflows for GenAI Applications -- Astronomer
+    \item \textbf{Certification:} Microsoft Certified: Azure AI Fundamentals
+    \item \textbf{Award:} Winner, University of Hertfordshire Agentic AI Competition (Project: VisionAID)
+\end{itemize}
+
+% === LEADERSHIP & VOLUNTEERING ===
+\sect{Leadership \& Volunteering}
+\begin{itemize}[leftmargin=*, itemsep=0pt, parsep=0pt, topsep=2pt]
+    \item \textbf{Volunteer}, DataKind UK (Aug 2025 – Present)
+    \item \textbf{Volunteer}, The Felix Project, UK (2024 – Present)
+    \item \textbf{Director of Finance}, Rotaract Club of Rathnapura, Sri Lanka \& Maldives (2022 – 2023)
+    \item \textbf{Volunteer}, Rotaract Club (2021 – 2023)
+\end{itemize}
+
+% === REFERENCES ===
+\sect{References}
+Available upon request or contact Mr.Lasitha Gunasinghe - +447399375598(Senior Cyber-Security Engineer, Kyocera Document Solutions, UK).
+
+\end{document}

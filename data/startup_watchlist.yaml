@@ -8,15 +8,15 @@
 
 - company: "Wayve"
   careers_url: "https://wayve.ai/careers"
-  stage: "series_b"
+  stage: "series_d"
 
 - company: "PolyAI"
   careers_url: "https://poly.ai/careers"
-  stage: "series_b"
+  stage: "series_c"
 
 - company: "Synthesia"
   careers_url: "https://www.synthesia.io/careers"
-  stage: "series_b"
+  stage: "series_e"
 
 - company: "Faculty AI"
   careers_url: "https://faculty.ai/careers"
@@ -24,27 +24,15 @@
 
 - company: "Cleo AI"
   careers_url: "https://web.meetcleo.com/careers"
-  stage: "series_b"
+  stage: "series_c"
 
 - company: "Moonhub"
   careers_url: "https://www.moonhub.ai/careers"
   stage: "seed"
 
-- company: "Cohere"
-  careers_url: "https://cohere.com/careers"
-  stage: "series_b"
-
-- company: "Mistral AI"
-  careers_url: "https://mistral.ai/careers"
-  stage: "series_a"
-
-- company: "Hugging Face"
-  careers_url: "https://huggingface.co/jobs"
-  stage: "growth"
-
 - company: "Graphcore"
   careers_url: "https://www.graphcore.ai/careers"
-  stage: "growth"
+  stage: "acquired"
 
 - company: "Benevolent AI"
   careers_url: "https://www.benevolent.com/careers"
@@ -52,7 +40,7 @@
 
 - company: "Tractable"
   careers_url: "https://tractable.ai/careers"
-  stage: "series_b"
+  stage: "series_c"
 
 - company: "Monzo"
   careers_url: "https://monzo.com/careers"
@@ -81,3 +69,85 @@
 - company: "DeepMind"
   careers_url: "https://deepmind.google/about/careers/"
   stage: "enterprise"
+
+# --- 2025/2026 UK ADDITIONS ---
+
+- company: "ElevenLabs"
+  careers_url: "https://elevenlabs.io/careers"
+  stage: "series_d"
+
+- company: "Ineffable Intelligence"
+  careers_url: "https://ineffable.ai/careers"
+  stage: "seed"
+
+- company: "PhysicsX"
+  careers_url: "https://www.physicsx.ai/careers"
+  stage: "series_b"
+
+- company: "Luminance"
+  careers_url: "https://www.luminance.com/careers/"
+  stage: "series_c"
+
+- company: "Granola"
+  careers_url: "https://granola.so/careers"
+  stage: "series_b"
+
+- company: "Metaview"
+  careers_url: "https://www.metaview.ai/careers"
+  stage: "series_b"
+
+- company: "Lupa"
+  careers_url: "https://www.lupa.com/careers"
+  stage: "series_a"
+
+- company: "Gradient Labs"
+  careers_url: "https://gradient-labs.ai/careers"
+  stage: "series_a"
+
+- company: "Wonder Studios"
+  careers_url: "https://wonder.ai/careers"
+  stage: "seed"
+
+- company: "Camera Intelligence"
+  careers_url: "https://cameraintelligence.com/careers"
+  stage: "seed"
+
+# --- LOGISTICS & SUPPLY CHAIN AI (UK) ---
+
+- company: "Oxa"
+  careers_url: "https://oxa.tech/careers"
+  stage: "series_d" # Just raised $103M in March 2026 for industrial autonomous logistics
+
+- company: "Dexory"
+  careers_url: "https://www.dexory.com/careers"
+  stage: "series_c" # $165M round; AI-driven autonomous robots for warehouse digital twins
+
+- company: "Relay"
+  careers_url: "https://www.relay.delivery/careers"
+  stage: "series_a" # AI-powered logistics network for last-mile delivery
+
+- company: "Corvera"
+  careers_url: "https://www.corvera.ai/careers"
+  stage: "seed" # Y-Combinator Winter 2026; AI automated supply chains for retail brands
+
+- company: "Previsico"
+  careers_url: "https://previsico.com/careers"
+  stage: "series_a" # AI demand forecasting and automated replenishment
+
+# --- RETAIL & E-COMMERCE AI (UK) ---
+
+- company: "Peak AI"
+  careers_url: "https://peak.ai/careers/"
+  stage: "series_c" # Decision intelligence AI for retail inventory and dynamic pricing
+
+- company: "Aura Vision"
+  careers_url: "https://auravision.ai/careers"
+  stage: "seed" # AI computer vision using existing security cameras for shop floor insights
+
+- company: "DigitalGenius"
+  careers_url: "https://digitalgenius.com/careers"
+  stage: "series_a" # AI-powered customer service automation specifically for e-commerce
+
+- company: "HubBox"
+  careers_url: "https://www.hubbox.com/careers"
+  stage: "series_a" # Retail tech software optimizing shipping and local pickup networks

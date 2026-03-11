@@ -51,12 +51,21 @@ class DispatcherAgent(BaseAgent):
         excel_path = output_dir / "JobForge_Digest.xlsx"
         self._build_excel(qualified, tailored_cvs, excel_path)
 
-        # Send email
+        # Send email — attach PDF if compiled, otherwise fall back to .tex
+        def _best_cv_path(cv: TailoredCV) -> Path | None:
+            pdf = Path(cv.pdf_path)
+            if pdf.exists():
+                return pdf
+            tex = pdf.with_suffix(".tex")
+            return tex if tex.exists() else None
+
+        cv_paths = [p for cv in tailored_cvs if (p := _best_cv_path(cv)) is not None]
+
         email_sent = False
         try:
             email_sent = self._send_email(
                 excel_path=excel_path,
-                cv_paths=[Path(cv.pdf_path) for cv in tailored_cvs if Path(cv.pdf_path).exists()],
+                cv_paths=cv_paths,
                 summary=match_summary,
                 date_str=today,
             )
@@ -178,7 +187,7 @@ Pipeline Summary:
   Total scraped:    {summary.total_scraped}
   After dedup:      {summary.total_after_dedup}
   LLM scored:       {summary.total_scored}
-  Qualified (≥70%): {summary.total_qualified}
+  Qualified (>={settings.pipeline.match_threshold}%): {summary.total_qualified}
   Sponsoring roles: {summary.sponsoring_jobs_count}
   Startup roles:    {summary.startup_jobs_count}
 
