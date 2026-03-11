@@ -9,7 +9,6 @@ packages = ["src/jobforge"]
 name = "jobforge-ai"
 version = "1.0.0"
 description = "Autonomous multi-agent job hunting pipeline"
-readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Viraj Bulugahapitiya", email = "amanthavirajavb@gmail.com" }]

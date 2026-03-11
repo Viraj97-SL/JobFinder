@@ -19,18 +19,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install Python dependencies (production only)
-COPY pyproject.toml ./
-RUN pip install --no-cache-dir -e .
-
-# Copy application code and data
+# Copy everything first (editable installs need source present)
 COPY . .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir .
 
 # Create output directories
 RUN mkdir -p data outputs/cvs
 
 # Extract skill inventory from master CV templates
-RUN python scripts/extract_skill_inventory.py || echo "[WARN] Skill inventory extraction skipped — run manually or ensure .tex files are present"
+RUN python scripts/extract_skill_inventory.py || echo "[WARN] Skill inventory extraction skipped"
 
 # Default: run the full pipeline (Railway overrides this with cron)
 CMD ["python", "scripts/run_pipeline.py"]
