@@ -14,6 +14,7 @@ Deep Agent Capabilities:
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -66,33 +67,45 @@ class MatchmakerAgent(DeepAgent):
         }
 
     async def execute(self, state: JobForgeState, plan: dict[str, Any]) -> dict[str, Any]:
-        """Score all jobs using dual-pass architecture."""
+        """Score all jobs in parallel using dual-pass architecture with score caching."""
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
+        from jobforge.memory.dedup_store import ScoreCache
+
         jobs: list[RawJob] = plan["jobs"]
         skill_inventory = plan["skill_inventory"]
 
         if not jobs:
             return {"scored_jobs": [], "qualified_jobs": []}
 
-        scored: list[ScoredJob] = []
+        # Create LLM and cache once for the entire batch
+        llm = ChatGoogleGenerativeAI(
+            model=settings.llm.fast_model,
+            google_api_key=settings.llm.gemini_api_key,
+            temperature=settings.llm.temperature,
+        )
+        cache = ScoreCache()
+        cache.evict_expired()
 
-        for job in jobs:
-            try:
-                score = await self._score_job(job, skill_inventory)
-                if score:
-                    # Apply visa adjustments
-                    score = self._apply_visa_adjustments(score)
-                    scored.append(score)
-            except Exception as e:
-                logger.error("matchmaker.score.error", job_id=job.job_id, error=str(e))
+        semaphore = asyncio.Semaphore(settings.pipeline.matchmaker_concurrency)
 
-        # Filter and rank
+        async def score_with_semaphore(job: RawJob) -> ScoredJob | None:
+            async with semaphore:
+                try:
+                    result = await self._score_job(job, skill_inventory, llm, cache)
+                    return self._apply_visa_adjustments(result) if result else None
+                except Exception as e:
+                    logger.error("matchmaker.score.error", job_id=job.job_id, error=str(e))
+                    return None
+
+        results = await asyncio.gather(*[score_with_semaphore(j) for j in jobs])
+        cache.close()
+
+        scored: list[ScoredJob] = [r for r in results if r is not None]
         qualified = [s for s in scored if s.overall_score >= self.threshold]
         qualified.sort(key=lambda s: s.overall_score, reverse=True)
 
-        return {
-            "scored_jobs": scored,
-            "qualified_jobs": qualified,
-        }
+        return {"scored_jobs": scored, "qualified_jobs": qualified}
 
     async def reflect(self, state: JobForgeState, result: dict[str, Any]) -> dict[str, Any]:
         """Check score distribution for anomalies."""
@@ -186,20 +199,25 @@ class MatchmakerAgent(DeepAgent):
 
     # ── PRIVATE ──
 
-    async def _score_job(self, job: RawJob, skill_inventory: Any) -> ScoredJob | None:
-        """Score a single job using Gemini Flash with structured JSON output."""
+    async def _score_job(
+        self,
+        job: RawJob,
+        skill_inventory: Any,
+        llm: Any,
+        cache: Any,
+    ) -> ScoredJob | None:
+        """Score a single job. Checks cache first; falls back to Gemini Flash."""
         import json as _json
 
         from langchain_core.messages import HumanMessage, SystemMessage
-        from langchain_google_genai import ChatGoogleGenerativeAI
 
-        llm = ChatGoogleGenerativeAI(
-            model=settings.llm.fast_model,
-            google_api_key=settings.llm.gemini_api_key,
-            temperature=settings.llm.temperature,
-        )
+        # ── Cache hit: skip LLM entirely ──
+        cached = cache.get(job.dedup_hash)
+        if cached:
+            logger.debug("matchmaker.score.cache_hit", job_id=job.job_id, title=job.title)
+            return ScoredJob(job=job, **cached)
 
-        # Serialise skill inventory (or fallback placeholder)
+        # ── Cache miss: call LLM ──
         if skill_inventory is not None:
             inventory_json = skill_inventory.model_dump_json(indent=2)
         else:
@@ -210,18 +228,15 @@ class MatchmakerAgent(DeepAgent):
             company=job.company,
             location=job.location,
             salary=job.salary_display,
-            description=job.description[:4000],  # Guard against token overflow
+            description=job.description[:4000],
             skill_inventory_json=inventory_json,
         )
 
-        messages = [
+        response = await llm.ainvoke([
             SystemMessage(content=MATCHMAKER_SYSTEM_PROMPT),
             HumanMessage(content=user_content),
-        ]
+        ])
 
-        response = await llm.ainvoke(messages)
-
-        # Strip markdown fences if model wraps in ```json
         raw = response.content.strip()
         if raw.startswith("```"):
             raw = raw.split("```", 2)[1]
@@ -231,6 +246,24 @@ class MatchmakerAgent(DeepAgent):
 
         match_score = MatchScore.model_validate(_json.loads(raw))
 
+        score_data = {
+            "overall_score":          match_score.overall_score,
+            "technical_skills_score": match_score.technical_skills_score,
+            "domain_experience_score": match_score.domain_experience_score,
+            "seniority_fit_score":    match_score.seniority_fit_score,
+            "location_score":         match_score.location_score,
+            "visa_score":             match_score.visa_score,
+            "role_alignment_score":   match_score.role_alignment_score,
+            "reasoning":              match_score.reasoning,
+            "key_matching_skills":    match_score.key_matching_skills,
+            "key_gaps":               match_score.key_gaps,
+            "transferable_highlights": match_score.transferable_highlights,
+            "recommended_cv_variant": match_score.recommended_cv_variant,
+        }
+
+        # Persist to cache for future runs
+        cache.set(job.dedup_hash, score_data)
+
         logger.debug(
             "matchmaker.score.done",
             job_id=job.job_id,
@@ -238,21 +271,7 @@ class MatchmakerAgent(DeepAgent):
             overall=match_score.overall_score,
         )
 
-        return ScoredJob(
-            job=job,
-            overall_score=match_score.overall_score,
-            technical_skills_score=match_score.technical_skills_score,
-            domain_experience_score=match_score.domain_experience_score,
-            seniority_fit_score=match_score.seniority_fit_score,
-            location_score=match_score.location_score,
-            visa_score=match_score.visa_score,
-            role_alignment_score=match_score.role_alignment_score,
-            reasoning=match_score.reasoning,
-            key_matching_skills=match_score.key_matching_skills,
-            key_gaps=match_score.key_gaps,
-            transferable_highlights=match_score.transferable_highlights,
-            recommended_cv_variant=match_score.recommended_cv_variant,
-        )
+        return ScoredJob(job=job, **score_data)
 
     def _apply_visa_adjustments(self, scored: ScoredJob) -> ScoredJob:
         """Apply PSW-specific visa score adjustments."""

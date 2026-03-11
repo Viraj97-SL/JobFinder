@@ -91,6 +91,10 @@ class PipelineSettings(BaseSettings):
     max_tailor_retries: int = 2
     daily_run_hour: int = 7
     max_jobs_per_source: int = 50
+    # Cost controls
+    max_cvs_per_run: int = 20          # Only tailor top-N by score; all jobs still in Excel
+    matchmaker_concurrency: int = 15   # Parallel Gemini Flash calls
+    tailor_concurrency: int = 5        # Parallel Gemini Pro calls
 
 
 class EmailSettings(BaseSettings):

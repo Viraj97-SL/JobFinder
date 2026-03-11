@@ -13,6 +13,7 @@ Deep Agent Capabilities:
 
 from __future__ import annotations
 
+import asyncio
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -52,15 +53,29 @@ class TailorAgent(DeepAgent):
         self.max_retries = settings.pipeline.max_tailor_retries
 
     async def plan(self, state: JobForgeState) -> dict[str, Any]:
-        """Plan CV tailoring for all qualified jobs."""
+        """Plan CV tailoring for top-N qualified jobs (all go in Excel, only top-N get CVs)."""
         qualified = state.get("qualified_jobs", [])
         skill_inventory = state.get("skill_inventory")
 
+        # Slice to top-N — qualified is already sorted by score descending
+        cap = settings.pipeline.max_cvs_per_run
+        to_tailor = qualified[:cap]
+        skipped = len(qualified) - len(to_tailor)
+
+        if skipped > 0:
+            logger.info(
+                "tailor.plan.capped",
+                total_qualified=len(qualified),
+                tailoring=len(to_tailor),
+                skipped=skipped,
+                reason=f"max_cvs_per_run={cap}",
+            )
+
         tailoring_plans = []
-        for job in qualified:
+        for job in to_tailor:
             variant = job.recommended_cv_variant
             if variant not in CV_VARIANTS:
-                variant = "ai_engineer"  # Fallback
+                variant = "ai_engineer"
 
             tailoring_plans.append({
                 "job": job,
@@ -73,22 +88,29 @@ class TailorAgent(DeepAgent):
         return {"plans": tailoring_plans, "skill_inventory": skill_inventory}
 
     async def execute(self, state: JobForgeState, plan: dict[str, Any]) -> dict[str, Any]:
-        """Generate tailored CVs with retry logic."""
+        """Generate tailored CVs in parallel with retry logic."""
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
         plans = plan["plans"]
         skill_inventory = plan["skill_inventory"]
 
-        tailored: list[TailoredCV] = []
-        errors: list[TailorError] = []
+        # Shared LLM instance for the whole batch
+        llm = ChatGoogleGenerativeAI(
+            model=settings.llm.deep_model,
+            google_api_key=settings.llm.gemini_api_key,
+            temperature=settings.llm.temperature,
+        )
 
-        for p in plans:
-            job: ScoredJob = p["job"]
-            variant = p["variant"]
-            result = await self._tailor_single(job, variant, skill_inventory)
+        semaphore = asyncio.Semaphore(settings.pipeline.tailor_concurrency)
 
-            if isinstance(result, TailoredCV):
-                tailored.append(result)
-            else:
-                errors.append(result)
+        async def tailor_with_semaphore(p: dict) -> TailoredCV | TailorError:
+            async with semaphore:
+                return await self._tailor_single(p["job"], p["variant"], skill_inventory, llm)
+
+        results = await asyncio.gather(*[tailor_with_semaphore(p) for p in plans])
+
+        tailored = [r for r in results if isinstance(r, TailoredCV)]
+        errors   = [r for r in results if isinstance(r, TailorError)]
 
         return {"tailored_cvs": tailored, "tailor_errors": errors}
 
@@ -121,7 +143,7 @@ class TailorAgent(DeepAgent):
     # ── PRIVATE ──
 
     async def _tailor_single(
-        self, job: ScoredJob, variant: str, skill_inventory: SkillInventory | None
+        self, job: ScoredJob, variant: str, skill_inventory: SkillInventory | None, llm: Any
     ) -> TailoredCV | TailorError:
         """Tailor a CV for a single job with retry logic."""
         base_tex_path = CV_VARIANTS.get(variant)
@@ -144,7 +166,7 @@ class TailorAgent(DeepAgent):
                 base_latex = base_tex_path.read_text(encoding="utf-8")
 
                 # ── LLM-driven modification ──
-                modified_latex = await self._modify_latex(base_latex, job, skill_inventory)
+                modified_latex = await self._modify_latex(base_latex, job, skill_inventory, llm)
 
                 # ── Hallucination check on modified LaTeX text ──
                 passed, violations = self._validate_against_inventory(
@@ -217,23 +239,15 @@ class TailorAgent(DeepAgent):
         )
 
     async def _modify_latex(
-        self, base_latex: str, job: ScoredJob, skill_inventory: SkillInventory | None
+        self, base_latex: str, job: ScoredJob, skill_inventory: SkillInventory | None, llm: Any
     ) -> str:
         """Call Gemini Pro to modify LaTeX sections for the target job."""
         from langchain_core.messages import HumanMessage, SystemMessage
-        from langchain_google_genai import ChatGoogleGenerativeAI
 
         from jobforge.config.prompts.tailor import (
             TAILOR_SKILLS_TEMPLATE,
             TAILOR_SUMMARY_TEMPLATE,
             TAILOR_SYSTEM_PROMPT,
-        )
-        from jobforge.config.settings import settings
-
-        llm = ChatGoogleGenerativeAI(
-            model=settings.llm.deep_model,
-            google_api_key=settings.llm.gemini_api_key,
-            temperature=settings.llm.temperature,
         )
 
         inventory_summary = (
