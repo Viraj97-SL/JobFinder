@@ -28,7 +28,9 @@ class RawJob(BaseModel):
     source: str = Field(description="Connector name: adzuna, reed, wellfound, etc.")
     posted_date: date | None = None
     company_stage: Literal[
-        "seed", "series_a", "series_b", "growth", "enterprise", "nonprofit", "unknown"
+        "seed", "series_a", "series_b", "series_c", "series_d", "series_e",
+        "series_f", "series_g", "growth", "enterprise", "nonprofit",
+        "recently_funded", "acquired", "public", "government", "unknown"
     ] | None = None
     work_model: Literal["remote", "hybrid", "onsite", "unknown"] | None = None
     is_startup: bool = False

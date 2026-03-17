@@ -151,3 +151,363 @@
 - company: "HubBox"
   careers_url: "https://www.hubbox.com/careers"
   stage: "series_a" # Retail tech software optimizing shipping and local pickup networks
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# --- HEALTHCARE & BIOTECH AI (UK) ---
+# ═══════════════════════════════════════════════════════════════════════════════
+
+- company: "Exscientia"
+  careers_url: "https://www.exscientia.ai/careers"
+  stage: "public" # AI-first drug discovery; Oxford-based, NASDAQ listed
+
+- company: "Healx"
+  careers_url: "https://healx.ai/careers"
+  stage: "series_c" # AI rare disease drug discovery
+
+- company: "Kheiron Medical"
+  careers_url: "https://www.kheironmed.com/careers"
+  stage: "series_b" # AI radiology screening (mammography)
+
+- company: "Perspectum"
+  careers_url: "https://perspectum.com/careers"
+  stage: "series_b" # AI liver/metabolic disease diagnostics
+
+- company: "Huma"
+  careers_url: "https://huma.com/careers"
+  stage: "series_c" # Digital health platform with AI monitoring
+
+- company: "ieso Digital Health"
+  careers_url: "https://www.iesohealth.com/careers"
+  stage: "series_c" # AI-powered CBT therapy (NLP-driven)
+
+- company: "Brainomix"
+  careers_url: "https://www.brainomix.com/careers"
+  stage: "series_b" # AI stroke imaging; Oxford spin-out
+
+- company: "Optellum"
+  careers_url: "https://optellum.com/careers"
+  stage: "series_a" # AI lung cancer early detection
+
+- company: "Arctoris"
+  careers_url: "https://arctoris.com/careers"
+  stage: "series_b" # Fully automated drug discovery robotics + AI
+
+- company: "Owkin"
+  careers_url: "https://owkin.com/careers"
+  stage: "series_b" # Federated learning for oncology AI; London office
+
+- company: "Patchwork Health"
+  careers_url: "https://patchwork.health/careers"
+  stage: "series_b" # AI NHS workforce scheduling
+
+- company: "Tympa Health"
+  careers_url: "https://tympahealth.com/careers"
+  stage: "series_a" # AI ear/hearing diagnostics
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# --- FINTECH & INSURTECH AI (UK) ---
+# ═══════════════════════════════════════════════════════════════════════════════
+
+- company: "Thought Machine"
+  careers_url: "https://thoughtmachine.net/careers"
+  stage: "series_d" # Core banking AI platform; Lloyds, JP Morgan clients
+
+- company: "Quantexa"
+  careers_url: "https://www.quantexa.com/careers"
+  stage: "series_e" # Contextual intelligence AI for financial crime
+
+- company: "Featurespace"
+  careers_url: "https://www.featurespace.com/careers"
+  stage: "acquired" # HSBC acquired; adaptive behavioural AI for fraud
+
+- company: "Onfido"
+  careers_url: "https://onfido.com/careers"
+  stage: "acquired" # Entrust acquired; AI identity verification
+
+- company: "Darktrace"
+  careers_url: "https://darktrace.com/careers"
+  stage: "public" # AI cybersecurity; NASDAQ listed
+
+- company: "Cytora"
+  careers_url: "https://cytora.com/careers"
+  stage: "series_b" # AI commercial insurance underwriting
+
+- company: "Eigen Technologies"
+  careers_url: "https://www.eigentech.com/careers"
+  stage: "series_b" # NLP document intelligence for financial services
+
+- company: "Multiverse"
+  careers_url: "https://www.multiverse.io/en-GB/careers"
+  stage: "series_d" # AI-powered apprenticeships / workforce learning
+
+- company: "GoCardless"
+  careers_url: "https://gocardless.com/careers"
+  stage: "series_g" # Bank payment platform with strong ML/data team
+
+- company: "Zopa"
+  careers_url: "https://www.zopa.com/careers"
+  stage: "growth" # Digital bank with ML credit risk team
+
+- company: "Causalens"
+  careers_url: "https://causalens.com/careers"
+  stage: "series_a" # Causal AI decision intelligence for finance
+
+- company: "Fidel API"
+  careers_url: "https://fidel.uk/careers"
+  stage: "series_b" # Transaction data API with ML enrichment
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# --- AI SAFETY & ALIGNMENT (UK) ---
+# ═══════════════════════════════════════════════════════════════════════════════
+
+- company: "Conjecture"
+  careers_url: "https://conjecture.dev/careers"
+  stage: "seed" # AI alignment research lab; London
+
+- company: "Apollo Research"
+  careers_url: "https://www.apolloresearch.ai/careers"
+  stage: "seed" # AI model evaluation and safety; London
+
+- company: "Palisade Research"
+  careers_url: "https://palisaderesearch.org/careers"
+  stage: "nonprofit" # AI safety research; London
+
+- company: "UK AI Safety Institute"
+  careers_url: "https://www.gov.uk/government/organisations/ai-safety-institute/about/jobs"
+  stage: "government" # UK AISI / DSIT; London
+
+- company: "Apart Research"
+  careers_url: "https://apartresearch.com/careers"
+  stage: "nonprofit" # AI safety interpretability research
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# --- AUTONOMOUS SYSTEMS & ROBOTICS (UK) ---
+# ═══════════════════════════════════════════════════════════════════════════════
+
+- company: "Oxbotica"
+  careers_url: "https://www.oxbotica.com/careers"
+  stage: "series_c" # Autonomous vehicle software; Oxford/London
+
+- company: "Secondmind"
+  careers_url: "https://www.secondmind.ai/careers"
+  stage: "series_a" # Probabilistic ML for engineering decisions
+
+- company: "Hadean"
+  careers_url: "https://hadean.com/careers"
+  stage: "series_a" # Spatial simulation + AI for defence/gaming
+
+- company: "Automata Technologies"
+  careers_url: "https://www.automata.tech/careers"
+  stage: "series_b" # Lab automation robotics + AI scheduling
+
+- company: "Kaedim"
+  careers_url: "https://www.kaedim3d.com/careers"
+  stage: "series_a" # AI 3D model generation from 2D images
+
+- company: "CMR Surgical"
+  careers_url: "https://cmrsurgical.com/careers"
+  stage: "series_d" # AI-guided surgical robotics; Cambridge
+
+- company: "Unmanned Life"
+  careers_url: "https://unmanned.life/careers"
+  stage: "series_a" # Autonomous drone orchestration AI; London
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# --- ENTERPRISE & PRODUCTIVITY AI (UK) ---
+# ═══════════════════════════════════════════════════════════════════════════════
+
+- company: "Speechmatics"
+  careers_url: "https://www.speechmatics.com/careers"
+  stage: "series_c" # Speech recognition API; Cambridge/London
+
+- company: "Signal AI"
+  careers_url: "https://www.signal-ai.com/careers"
+  stage: "series_c" # AI media monitoring and intelligence
+
+- company: "Edited"
+  careers_url: "https://edited.com/careers"
+  stage: "series_b" # AI retail trend and pricing intelligence
+
+- company: "Relative Insight"
+  careers_url: "https://www.relativeinsight.com/careers"
+  stage: "series_a" # NLP language analytics platform
+
+- company: "Amplyfi"
+  careers_url: "https://amplyfi.com/careers"
+  stage: "series_a" # AI deep web intelligence analytics
+
+- company: "Beamery"
+  careers_url: "https://beamery.com/careers"
+  stage: "series_c" # AI talent lifecycle management platform
+
+- company: "Improbable"
+  careers_url: "https://www.improbable.io/careers"
+  stage: "series_b" # Metaverse + distributed simulation AI
+
+- company: "IXICO"
+  careers_url: "https://ixico.com/careers"
+  stage: "public" # AI neuroimaging analysis; AIM-listed London
+
+- company: "Calio"
+  careers_url: "https://calio.ai/careers"
+  stage: "seed" # AI legal research and drafting
+
+- company: "Reachy"
+  careers_url: "https://reachy.ai/careers"
+  stage: "seed" # AI document understanding
+
+- company: "Klarity"
+  careers_url: "https://www.klarity.ai/careers"
+  stage: "series_a" # AI contract review for finance teams
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# --- CLIMATE & SUSTAINABILITY AI (UK) ---
+# ═══════════════════════════════════════════════════════════════════════════════
+
+- company: "Cervest"
+  careers_url: "https://cervest.earth/careers"
+  stage: "series_a" # Climate risk AI intelligence platform
+
+- company: "Kita"
+  careers_url: "https://www.kita.earth/careers"
+  stage: "seed" # AI carbon insurance and risk platform
+
+- company: "Xpansiv"
+  careers_url: "https://xpansiv.com/careers"
+  stage: "series_b" # AI carbon market intelligence; London office
+
+- company: "Pivot Earth"
+  careers_url: "https://pivot.earth/careers"
+  stage: "seed" # AI for carbon project development
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# --- PROPTECH & CONSTRUCTION AI (UK) ---
+# ═══════════════════════════════════════════════════════════════════════════════
+
+- company: "Geovation"
+  careers_url: "https://geovation.uk/careers"
+  stage: "nonprofit" # Ordnance Survey + Land Registry AI hub
+
+- company: "Coadjute"
+  careers_url: "https://coadjute.com/careers"
+  stage: "series_a" # Blockchain + AI for property transactions
+
+- company: "Zutec"
+  careers_url: "https://zutec.com/careers"
+  stage: "series_a" # AI construction quality management
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# --- BIG TECH UK AI LABS & RESEARCH (London offices) ---
+# ═══════════════════════════════════════════════════════════════════════════════
+
+- company: "Google DeepMind"
+  careers_url: "https://deepmind.google/about/careers/"
+  stage: "enterprise"
+
+- company: "Meta AI Research (London)"
+  careers_url: "https://www.metacareers.com/jobs?offices[0]=London%2C+England"
+  stage: "enterprise"
+
+- company: "Microsoft Research Cambridge"
+  careers_url: "https://careers.microsoft.com/v2/global/en/search?q=cambridge+research"
+  stage: "enterprise"
+
+- company: "Amazon Science (London)"
+  careers_url: "https://www.amazon.science/job-postings?f%5B%5D=location%3ALondon"
+  stage: "enterprise"
+
+- company: "Samsung AI Centre (Cambridge)"
+  careers_url: "https://research.samsung.com/aicenter_cambridge"
+  stage: "enterprise"
+
+- company: "Cohere (London)"
+  careers_url: "https://cohere.com/careers"
+  stage: "series_c" # LLM API company; significant London presence
+
+- company: "Mistral AI (London)"
+  careers_url: "https://mistral.ai/careers"
+  stage: "series_b" # Paris HQ but UK hiring
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# --- EDUCATION & RESEARCH AI (UK) ---
+# ═══════════════════════════════════════════════════════════════════════════════
+
+- company: "Kortext"
+  careers_url: "https://kortext.com/about/careers"
+  stage: "series_a" # AI-powered digital textbook platform
+
+- company: "Century Tech"
+  careers_url: "https://www.century.tech/careers"
+  stage: "series_b" # AI personalised learning platform for schools
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# --- RECENTLY FUNDED (2024–2026, via Sifted / TechCrunch) ---
+# ═══════════════════════════════════════════════════════════════════════════════
+
+- company: "Sana AI"
+  careers_url: "https://www.sana.ai/careers"
+  stage: "series_b" # Enterprise knowledge AI; raised $55M; London office
+
+- company: "Writer"
+  careers_url: "https://writer.com/careers"
+  stage: "series_c" # Enterprise generative AI platform; UK presence
+
+- company: "Magic AI"
+  careers_url: "https://magic.dev/careers"
+  stage: "series_b" # Code generation AI; London office
+
+- company: "Vercel (AI team)"
+  careers_url: "https://vercel.com/careers"
+  stage: "series_e" # Frontend/AI infra; active London hiring
+
+- company: "Replit"
+  careers_url: "https://replit.com/site/careers"
+  stage: "series_b" # AI-first coding platform; London engineers
+
+- company: "Dust"
+  careers_url: "https://dust.tt/careers"
+  stage: "series_a" # AI assistant builder for enterprise; EU/UK
+
+- company: "Coreweave (UK)"
+  careers_url: "https://coreweave.com/careers"
+  stage: "series_c" # GPU cloud for AI; major London presence post-2025
+
+- company: "Poolside AI"
+  careers_url: "https://poolside.ai/careers"
+  stage: "series_b" # Code LLM; London office (raised $500M)
+
+- company: "Normal Computing"
+  careers_url: "https://www.normalcomputing.com/careers"
+  stage: "series_a" # Thermodynamic AI chips; London office
+
+- company: "Waymo (London R&D)"
+  careers_url: "https://waymo.com/careers"
+  stage: "enterprise" # Alphabet AV; London AI research office
+
+- company: "Character AI (London)"
+  careers_url: "https://careers.character.ai"
+  stage: "series_b" # Conversational AI; engineering in London
+
+- company: "Adaptive ML"
+  careers_url: "https://www.adaptive-ml.com/careers"
+  stage: "series_a" # Online RLHF for enterprise LLMs; London office
+
+- company: "Artisan AI"
+  careers_url: "https://www.artisan.co/careers"
+  stage: "series_a" # AI sales automation agents; London
+
+- company: "Convergence AI"
+  careers_url: "https://convergence.ai/careers"
+  stage: "seed" # London-based AGI-focused startup (raised $12M 2024)
+
+- company: "Anterior"
+  careers_url: "https://www.anterior.com/careers"
+  stage: "series_a" # AI clinical decision support for US/UK insurers; London HQ
+
+- company: "Abound"
+  careers_url: "https://abound.loan/careers"
+  stage: "series_b" # AI credit underwriting; London fintech
+
+- company: "Attest"
+  careers_url: "https://www.attest.com/careers"
+  stage: "series_c" # Consumer insights AI; London
