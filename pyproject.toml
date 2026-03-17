@@ -36,8 +36,10 @@ dependencies = [
     "openpyxl>=3.1.0",
 
     # ── Persistence ──
+    "sqlalchemy>=2.0.0",
     "aiosqlite>=0.19.0",
     "asyncpg>=0.29.0",
+    "psycopg2-binary>=2.9.0",
 
     # ── Email ──
     "resend>=2.0.0",
