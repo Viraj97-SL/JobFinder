@@ -99,6 +99,7 @@ class TailorAgent(DeepAgent):
             model=settings.llm.deep_model,
             google_api_key=settings.llm.gemini_api_key,
             temperature=settings.llm.temperature,
+            request_timeout=90,   # fail fast if Gemini Pro hangs
         )
 
         semaphore = asyncio.Semaphore(settings.pipeline.tailor_concurrency)
@@ -360,7 +361,7 @@ Return ONLY the complete modified LaTeX document. No explanation, no markdown fe
         ]
         for cmd in compilers:
             try:
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
                 if result.returncode == 0:
                     return True
                 logger.warning(

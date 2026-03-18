@@ -115,6 +115,7 @@ class MatchmakerAgent(DeepAgent):
             model=settings.llm.fast_model,
             google_api_key=settings.llm.gemini_api_key,
             temperature=settings.llm.temperature,
+            request_timeout=45,   # Gemini Flash should respond well within 45s
         )
         cache = ScoreCache()
         cache.evict_expired()
