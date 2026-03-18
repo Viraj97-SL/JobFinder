@@ -179,6 +179,14 @@ class DispatcherAgent(BaseAgent):
             f"Top: {summary.highest_score:.0f}% at {top_company}"
         )
 
+        # Market intelligence section
+        market_section = ""
+        try:
+            from jobforge.analytics.market_analyzer import MarketAnalyzer
+            market_section = "\n\n" + MarketAnalyzer().generate_text_report()
+        except Exception as e:
+            logger.warning("dispatcher.market_report.failed", error=str(e))
+
         # Build body
         body = f"""JobForge AI Daily Digest — {date_str}
 {'='*50}
@@ -199,7 +207,7 @@ Score Distribution:
 Top Match: {summary.highest_score:.0f}% at {top_company}
 
 Attached: Excel digest + {len(cv_paths)} tailored CVs.
-
+{market_section}
 — JobForge AI (Autonomous Pipeline)
 """
 

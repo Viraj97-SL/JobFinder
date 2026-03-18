@@ -98,6 +98,9 @@ class PipelineSettings(BaseSettings):
     # ML pre-screen gate (runs before LLM, cuts ~50% of calls)
     ml_prescreen_enabled: bool = True
     ml_prescreen_threshold: float = 0.30  # Weighted ensemble cutoff [0, 1]
+    # RAG few-shot context for Tailor Agent
+    rag_enabled: bool = True
+    rag_top_k: int = 3  # Number of similar past tailoring examples to retrieve
 
 
 class EmailSettings(BaseSettings):
@@ -130,6 +133,13 @@ class Settings(BaseSettings):
     visa: VisaSettings = Field(default_factory=VisaSettings)
     pipeline: PipelineSettings = Field(default_factory=PipelineSettings)
     email: EmailSettings = Field(default_factory=EmailSettings)
+
+    # ChromaDB persist directory for RAG tailoring store
+    #chroma_db_dir: str = str(DATA_DIR / "chroma_db")
+    chroma_db_dir: str = Field(
+        default=str(DATA_DIR / "chroma_db"), validation_alias="CHROMA_DB_DIR",
+    )
+
 
     # Railway auto-sets DATABASE_URL as postgresql://... — we normalise it for asyncpg.
     # Locally falls back to SQLite.

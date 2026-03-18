@@ -38,7 +38,7 @@ from jobforge.connectors.linkedin_proxy import LinkedInProxyConnector
 from jobforge.connectors.recruiter_boards import RecruiterBoardsConnector
 from jobforge.connectors.reed import ReedConnector
 from jobforge.connectors.wellfound import WellfoundConnector
-from jobforge.memory.dedup_store import DedupStore
+from jobforge.memory.dedup_store import AnalyticsStore, DedupStore
 from jobforge.models.job import RawJob
 from jobforge.models.state import JobForgeState, ScoutMetadata
 
@@ -195,6 +195,19 @@ class ScoutAgent(DeepAgent):
             new_jobs = dedup_store.filter_new(intra_deduped)
         finally:
             dedup_store.close()
+
+        # ── Analytics logging ──────────────────────────────────────────────────
+        run_id = state.get("run_id", "unknown")
+        skill_inventory = state.get("skill_inventory")
+        analytics_store = AnalyticsStore()
+        try:
+            for job in new_jobs:
+                try:
+                    analytics_store.log_job(job, run_id, skill_inventory)
+                except Exception as e:
+                    logger.debug("scout.analytics.log_failed", job_id=job.job_id, error=str(e))
+        finally:
+            analytics_store.close()
 
         duration = time.time() - start_time
 

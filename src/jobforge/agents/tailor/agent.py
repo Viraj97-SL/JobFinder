@@ -103,9 +103,18 @@ class TailorAgent(DeepAgent):
 
         semaphore = asyncio.Semaphore(settings.pipeline.tailor_concurrency)
 
+        # Initialise RAG store once (lazy — skipped if rag_enabled=False or chromadb missing)
+        rag_store = None
+        if settings.pipeline.rag_enabled:
+            try:
+                from jobforge.memory.rag_store import RAGStore
+                rag_store = RAGStore()
+            except Exception as e:
+                logger.warning("tailor.rag.init_failed", error=str(e))
+
         async def tailor_with_semaphore(p: dict) -> TailoredCV | TailorError:
             async with semaphore:
-                return await self._tailor_single(p["job"], p["variant"], skill_inventory, llm)
+                return await self._tailor_single(p["job"], p["variant"], skill_inventory, llm, rag_store)
 
         results = await asyncio.gather(*[tailor_with_semaphore(p) for p in plans])
 
@@ -143,7 +152,12 @@ class TailorAgent(DeepAgent):
     # ── PRIVATE ──
 
     async def _tailor_single(
-        self, job: ScoredJob, variant: str, skill_inventory: SkillInventory | None, llm: Any
+        self,
+        job: ScoredJob,
+        variant: str,
+        skill_inventory: SkillInventory | None,
+        llm: Any,
+        rag_store: Any = None,
     ) -> TailoredCV | TailorError:
         """Tailor a CV for a single job with retry logic."""
         base_tex_path = CV_VARIANTS.get(variant)
@@ -166,7 +180,7 @@ class TailorAgent(DeepAgent):
                 base_latex = base_tex_path.read_text(encoding="utf-8")
 
                 # ── LLM-driven modification ──
-                modified_latex = await self._modify_latex(base_latex, job, skill_inventory, llm)
+                modified_latex = await self._modify_latex(base_latex, job, skill_inventory, llm, rag_store)
 
                 # ── Hallucination check on modified LaTeX text ──
                 passed, violations = self._validate_against_inventory(
@@ -208,6 +222,18 @@ class TailorAgent(DeepAgent):
 
                 sections = self._identify_sections(job)
 
+                # ── Store successful tailoring in RAG for future few-shot context ──
+                if rag_store is not None and passed:
+                    try:
+                        rag_store.store_tailoring(
+                            job=job,
+                            cv_variant=variant,
+                            sections_modified=sections,
+                            hallucination_passed=passed,
+                        )
+                    except Exception as e:
+                        logger.debug("tailor.rag.store_failed", error=str(e))
+
                 return TailoredCV(
                     job_id=job.job.job_id,
                     company=job.job.company,
@@ -239,7 +265,12 @@ class TailorAgent(DeepAgent):
         )
 
     async def _modify_latex(
-        self, base_latex: str, job: ScoredJob, skill_inventory: SkillInventory | None, llm: Any
+        self,
+        base_latex: str,
+        job: ScoredJob,
+        skill_inventory: SkillInventory | None,
+        llm: Any,
+        rag_store: Any = None,
     ) -> str:
         """Call Gemini Pro to modify LaTeX sections for the target job."""
         from langchain_core.messages import HumanMessage, SystemMessage
@@ -266,12 +297,22 @@ PROJECTS BANK (select the 3–4 most relevant projects for this role and replace
 {projects_bank[:4000]}
 """ if projects_bank else ""
 
+        # ── RAG few-shot context ──
+        rag_context = ""
+        if rag_store is not None:
+            try:
+                from jobforge.memory.rag_store import RAGStore
+                examples = rag_store.find_similar(job, top_k=settings.pipeline.rag_top_k)
+                rag_context = RAGStore.format_examples_for_prompt(examples)
+            except Exception as e:
+                logger.debug("tailor.rag.query_failed", error=str(e))
+
         # Build a single prompt that asks the model to return the full modified LaTeX
         user_prompt = f"""Modify the following LaTeX CV to better match the target job.
 
 CRITICAL: Return the COMPLETE LaTeX document. Do NOT truncate, shorten, or omit any sections.
 Preserve ALL existing sections (Header, Education, etc.) exactly as-is unless they are in SECTIONS TO MODIFY.
-
+{rag_context}
 TARGET JOB:
 Title: {job.job.title}
 Company: {job.job.company}

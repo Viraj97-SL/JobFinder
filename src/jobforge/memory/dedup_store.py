@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta
+from typing import Any
 
 import structlog
 from sqlalchemy import create_engine, text
@@ -103,9 +104,32 @@ def init_database() -> None:
             expires_at TEXT NOT NULL
         )
         """,
+        """
+        CREATE TABLE IF NOT EXISTS job_analytics (
+            job_id TEXT PRIMARY KEY,
+            dedup_hash TEXT NOT NULL,
+            run_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            company TEXT NOT NULL,
+            location TEXT,
+            source TEXT NOT NULL,
+            salary_min REAL,
+            salary_max REAL,
+            work_model TEXT,
+            company_stage TEXT,
+            is_startup INTEGER DEFAULT 0,
+            offers_sponsorship INTEGER,
+            overall_score REAL,
+            cv_variant TEXT,
+            matched_skills_json TEXT,
+            scraped_at TEXT NOT NULL
+        )
+        """,
         "CREATE INDEX IF NOT EXISTS idx_seen_jobs_hash ON seen_jobs(dedup_hash)",
         "CREATE INDEX IF NOT EXISTS idx_score_history_run ON score_history(run_id)",
         "CREATE INDEX IF NOT EXISTS idx_score_cache_expires ON score_cache(expires_at)",
+        "CREATE INDEX IF NOT EXISTS idx_job_analytics_run ON job_analytics(run_id)",
+        "CREATE INDEX IF NOT EXISTS idx_job_analytics_scraped ON job_analytics(scraped_at)",
     ]
 
     with engine.connect() as conn:
@@ -308,6 +332,86 @@ class ScoreCache:
             )
             conn.commit()
         return result.rowcount
+
+    def close(self) -> None:
+        pass
+
+
+class AnalyticsStore:
+    """
+    Logs every scraped job to the job_analytics table for market trend analysis.
+
+    Populated by the Scout Agent post-dedup so only fresh jobs are recorded.
+    Score and CV variant columns are updated later by Matchmaker/Tailor.
+    """
+
+    def __init__(self) -> None:
+        self._engine = get_engine()
+
+    def log_job(self, job: Any, run_id: str, skill_inventory: Any = None) -> None:
+        """Insert a new job into the analytics table. Skips on conflict (already logged)."""
+        matched_skills: list[str] = []
+        if skill_inventory is not None:
+            try:
+                all_skills = skill_inventory.get_all_skills_flat()
+                jd_tokens = set(
+                    t.lower()
+                    for t in (job.title + " " + (job.description or "")).split()
+                    if len(t) >= 2
+                )
+                matched_skills = [s for s in all_skills if s.lower() in jd_tokens]
+            except Exception:
+                pass
+
+        now = datetime.utcnow().isoformat()
+        with self._engine.connect() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO job_analytics
+                        (job_id, dedup_hash, run_id, title, company, location, source,
+                         salary_min, salary_max, work_model, company_stage, is_startup,
+                         offers_sponsorship, matched_skills_json, scraped_at)
+                    VALUES
+                        (:job_id, :dedup_hash, :run_id, :title, :company, :location, :source,
+                         :salary_min, :salary_max, :work_model, :company_stage, :is_startup,
+                         :offers_sponsorship, :matched_skills_json, :scraped_at)
+                    ON CONFLICT(job_id) DO NOTHING
+                """),
+                {
+                    "job_id": job.job_id,
+                    "dedup_hash": job.dedup_hash,
+                    "run_id": run_id,
+                    "title": job.title,
+                    "company": job.company,
+                    "location": getattr(job, "location", None),
+                    "source": job.source,
+                    "salary_min": getattr(job, "salary_min", None),
+                    "salary_max": getattr(job, "salary_max", None),
+                    "work_model": getattr(job, "work_model", None),
+                    "company_stage": getattr(job, "company_stage", None),
+                    "is_startup": int(getattr(job, "is_startup", False)),
+                    "offers_sponsorship": (
+                        1 if getattr(job, "offers_sponsorship", None) is True
+                        else (0 if getattr(job, "offers_sponsorship", None) is False else None)
+                    ),
+                    "matched_skills_json": json.dumps(matched_skills),
+                    "scraped_at": now,
+                },
+            )
+            conn.commit()
+
+    def update_score(self, job_id: str, overall_score: float, cv_variant: str | None = None) -> None:
+        """Update analytics record with Matchmaker score and (optionally) CV variant."""
+        with self._engine.connect() as conn:
+            conn.execute(
+                text("""
+                    UPDATE job_analytics
+                    SET overall_score = :score, cv_variant = COALESCE(:variant, cv_variant)
+                    WHERE job_id = :job_id
+                """),
+                {"score": overall_score, "variant": cv_variant, "job_id": job_id},
+            )
+            conn.commit()
 
     def close(self) -> None:
         pass
