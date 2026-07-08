@@ -14,16 +14,104 @@ Stores:
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timedelta
 from typing import Any
 
+import numpy as np
 import structlog
+from datasketch import MinHash, MinHashLSH
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
+from jobforge.analytics.role_classifier import classify_role_category
 from jobforge.config.settings import settings
+from jobforge.utils.geography import normalize_location
+from jobforge.utils.salary_parser import normalize_to_annual
 
 logger = structlog.get_logger(__name__)
+
+# ── Fuzzy Dedup (MinHash LSH) ────────────────────────────────────────────────
+# Exact-hash dedup (title+company+location) misses reworded reposts of the
+# same role across boards. This layer catches those via near-duplicate JD text.
+#
+# Title is deliberately excluded from the shingle set. Reworded titles are
+# exactly the noise this layer needs to tolerate ("Senior ML Engineer" vs
+# "Senior Machine Learning Engineer — Content Intelligence" at the same
+# company). Word-shingling title and JD as one continuous token stream makes
+# every shingle near that boundary shift with the title, which drags the
+# real Jaccard score below threshold for precisely the reposts we want to
+# catch. Company + JD-prefix text carries the actual duplicate signal.
+_MINHASH_NUM_PERM = 128
+_MINHASH_SCHEME = "affine32"
+_FUZZY_JACCARD_THRESHOLD = 0.85
+_SHINGLE_SIZE = 4  # word-level shingles
+_DESCRIPTION_PREFIX_CHARS = 200
+
+
+def _normalize_for_shingles(company: str, description: str | None) -> str:
+    text_blob = f"{company} {(description or '')[:_DESCRIPTION_PREFIX_CHARS]}".lower()
+    text_blob = re.sub(r"[^a-z0-9\s]", " ", text_blob)
+    return re.sub(r"\s+", " ", text_blob).strip()
+
+
+def _word_shingles(text_blob: str, k: int = _SHINGLE_SIZE) -> set[str]:
+    tokens = text_blob.split()
+    if not tokens:
+        return set()
+    if len(tokens) < k:
+        return {" ".join(tokens)}
+    return {" ".join(tokens[i : i + k]) for i in range(len(tokens) - k + 1)}
+
+
+def compute_minhash(company: str, description: str | None) -> MinHash:
+    """MinHash signature over word shingles of company + first 200 chars of JD."""
+    mh = MinHash(num_perm=_MINHASH_NUM_PERM, scheme=_MINHASH_SCHEME)
+    for shingle in _word_shingles(_normalize_for_shingles(company, description)):
+        mh.update(shingle.encode("utf-8"))
+    return mh
+
+
+def _minhash_to_bytes(mh: MinHash) -> bytes:
+    return mh.hashvalues.tobytes()
+
+
+def _minhash_from_bytes(blob: bytes) -> MinHash:
+    hashvalues = np.frombuffer(bytes(blob), dtype=np.uint32)
+    return MinHash(num_perm=len(hashvalues), hashvalues=hashvalues, scheme=_MINHASH_SCHEME)
+
+
+def _load_lsh_index(engine: Engine) -> MinHashLSH:
+    """Rebuild the in-memory LSH index from every previously stored signature."""
+    lsh = MinHashLSH(threshold=_FUZZY_JACCARD_THRESHOLD, num_perm=_MINHASH_NUM_PERM)
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT dedup_hash, minhash_signature FROM seen_jobs WHERE minhash_signature IS NOT NULL")
+        ).fetchall()
+    for dedup_hash, blob in rows:
+        lsh.insert(dedup_hash, _minhash_from_bytes(blob))
+    return lsh
+
+
+def _ensure_column(engine: Engine, table: str, column: str, sqlite_type: str, pg_type: str) -> None:
+    """Add a column if it doesn't already exist yet (SQLite/Postgres-safe migration)."""
+    is_pg = engine.dialect.name == "postgresql"
+    with engine.connect() as conn:
+        if is_pg:
+            exists = conn.execute(
+                text(
+                    "SELECT 1 FROM information_schema.columns "
+                    "WHERE table_name = :t AND column_name = :c"
+                ),
+                {"t": table, "c": column},
+            ).fetchone()
+        else:
+            rows = conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
+            exists = any(row[1] == column for row in rows)
+        if not exists:
+            col_type = pg_type if is_pg else sqlite_type
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
+            conn.commit()
 
 
 def _make_sync_url(url: str) -> str:
@@ -137,19 +225,32 @@ def init_database() -> None:
             conn.execute(text(stmt))
         conn.commit()
 
+    _ensure_column(engine, "seen_jobs", "minhash_signature", "BLOB", "BYTEA")
+    _ensure_column(engine, "job_analytics", "salary_period", "TEXT", "TEXT")
+    _ensure_column(engine, "job_analytics", "salary_annual_min", "REAL", "REAL")
+    _ensure_column(engine, "job_analytics", "salary_annual_max", "REAL", "REAL")
+    _ensure_column(engine, "job_analytics", "role_category", "TEXT", "TEXT")
+    _ensure_column(engine, "job_analytics", "region", "TEXT", "TEXT")
+
     logger.info("database.init.complete")
 
 
 class DedupStore:
     """
-    Cross-run job deduplication using content hashes.
+    Cross-run job deduplication using content hashes plus fuzzy near-duplicate detection.
 
-    A job is considered a duplicate if its (title + company + location) hash
-    has been seen in any previous run. Duplicates are logged but not reprocessed.
+    Two layers, cheapest first:
+    1. Exact hash — (title + company + location) seen before → duplicate.
+    2. Fuzzy (MinHash LSH) — JD text is a near-duplicate (Jaccard >= 0.85) of a
+       previously seen job, e.g. the same role reposted under a reworded title
+       across boards. Catches reposts that the exact hash misses.
+
+    Duplicates from either layer are logged but not reprocessed.
     """
 
     def __init__(self) -> None:
         self._engine = get_engine()
+        self._lsh = _load_lsh_index(self._engine)
 
     def is_seen(self, dedup_hash: str) -> bool:
         with self._engine.connect() as conn:
@@ -159,29 +260,62 @@ class DedupStore:
             ).fetchone()
         return row is not None
 
-    def mark_seen(self, dedup_hash: str, job_id: str, title: str, company: str, source: str) -> None:
+    def find_fuzzy_duplicate(self, minhash: MinHash) -> str | None:
+        """Return the dedup_hash of a near-duplicate already in the LSH index, if any."""
+        matches = self._lsh.query(minhash)
+        return matches[0] if matches else None
+
+    def mark_seen(
+        self,
+        dedup_hash: str,
+        job_id: str,
+        title: str,
+        company: str,
+        source: str,
+        minhash: MinHash | None = None,
+    ) -> None:
         now = datetime.utcnow().isoformat()
+        signature = _minhash_to_bytes(minhash) if minhash is not None else None
         with self._engine.connect() as conn:
             conn.execute(
                 text("""
                     INSERT INTO seen_jobs
-                        (dedup_hash, job_id, title, company, source, first_seen_at, last_seen_at, times_seen)
-                    VALUES (:h, :jid, :t, :co, :src, :now, :now, 1)
+                        (dedup_hash, job_id, title, company, source, first_seen_at, last_seen_at,
+                         times_seen, minhash_signature)
+                    VALUES (:h, :jid, :t, :co, :src, :now, :now, 1, :sig)
                     ON CONFLICT(dedup_hash) DO UPDATE SET
                         last_seen_at = :now,
                         times_seen   = seen_jobs.times_seen + 1
                 """),
-                {"h": dedup_hash, "jid": job_id, "t": title, "co": company, "src": source, "now": now},
+                {"h": dedup_hash, "jid": job_id, "t": title, "co": company, "src": source,
+                 "now": now, "sig": signature},
             )
             conn.commit()
 
     def filter_new(self, jobs: list) -> list:
-        """Return only jobs not previously seen. Mark all as seen."""
+        """Return only jobs not previously seen (exact or fuzzy). Mark all as seen."""
         new_jobs = []
         for job in jobs:
-            if not self.is_seen(job.dedup_hash):
-                self.mark_seen(job.dedup_hash, job.job_id, job.title, job.company, job.source)
-                new_jobs.append(job)
+            if self.is_seen(job.dedup_hash):
+                continue
+
+            minhash = compute_minhash(job.company, getattr(job, "description", None))
+            fuzzy_match = self.find_fuzzy_duplicate(minhash)
+            if fuzzy_match is not None:
+                logger.info(
+                    "dedup.fuzzy_duplicate",
+                    job_id=job.job_id,
+                    title=job.title,
+                    company=job.company,
+                    matched_hash=fuzzy_match,
+                )
+                self.mark_seen(job.dedup_hash, job.job_id, job.title, job.company, job.source, minhash)
+                self._lsh.insert(job.dedup_hash, minhash)
+                continue
+
+            self.mark_seen(job.dedup_hash, job.job_id, job.title, job.company, job.source, minhash)
+            self._lsh.insert(job.dedup_hash, minhash)
+            new_jobs.append(job)
         return new_jobs
 
     def get_total_seen(self) -> int:
@@ -363,17 +497,26 @@ class AnalyticsStore:
             except Exception:
                 pass
 
+        salary_period = getattr(job, "salary_period", None) or "unknown"
+        salary_annual_min, salary_annual_max = normalize_to_annual(
+            getattr(job, "salary_min", None), getattr(job, "salary_max", None), salary_period
+        )
+        role_category = classify_role_category(job.title, getattr(job, "description", None))
+        region = normalize_location(getattr(job, "location", None))
+
         now = datetime.utcnow().isoformat()
         with self._engine.connect() as conn:
             conn.execute(
                 text("""
                     INSERT INTO job_analytics
                         (job_id, dedup_hash, run_id, title, company, location, source,
-                         salary_min, salary_max, work_model, company_stage, is_startup,
+                         salary_min, salary_max, salary_period, salary_annual_min, salary_annual_max,
+                         work_model, company_stage, is_startup, role_category, region,
                          offers_sponsorship, matched_skills_json, scraped_at)
                     VALUES
                         (:job_id, :dedup_hash, :run_id, :title, :company, :location, :source,
-                         :salary_min, :salary_max, :work_model, :company_stage, :is_startup,
+                         :salary_min, :salary_max, :salary_period, :salary_annual_min, :salary_annual_max,
+                         :work_model, :company_stage, :is_startup, :role_category, :region,
                          :offers_sponsorship, :matched_skills_json, :scraped_at)
                     ON CONFLICT(job_id) DO NOTHING
                 """),
@@ -387,9 +530,14 @@ class AnalyticsStore:
                     "source": job.source,
                     "salary_min": getattr(job, "salary_min", None),
                     "salary_max": getattr(job, "salary_max", None),
+                    "salary_period": salary_period,
+                    "salary_annual_min": salary_annual_min,
+                    "salary_annual_max": salary_annual_max,
                     "work_model": getattr(job, "work_model", None),
                     "company_stage": getattr(job, "company_stage", None),
                     "is_startup": int(getattr(job, "is_startup", False)),
+                    "role_category": role_category,
+                    "region": region,
                     "offers_sponsorship": (
                         1 if getattr(job, "offers_sponsorship", None) is True
                         else (0 if getattr(job, "offers_sponsorship", None) is False else None)

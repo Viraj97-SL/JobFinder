@@ -23,6 +23,7 @@ class RawJob(BaseModel):
     location: str
     salary_min: float | None = None
     salary_max: float | None = None
+    salary_period: Literal["annual", "daily", "hourly", "unknown"] | None = None
     description: str = Field(max_length=8000, description="Full JD text")
     url: str
     source: str = Field(description="Connector name: adzuna, reed, wellfound, etc.")

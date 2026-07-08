@@ -44,6 +44,19 @@ def main() -> None:
             "source_breakdown": analyzer.source_breakdown(),
             "score_trend": analyzer.score_trend(),
             "cv_variants": analyzer.cv_variant_distribution(),
+            "deltas": {
+                metric: analyzer.metric_deltas(metric, weeks=1)
+                for metric in ("total_volume", "sponsorship_rate", "startup_share", "salary_median")
+            },
+            "skill_trajectories": analyzer.skill_trajectories(),
+            "rising_cooling_skills": analyzer.rising_cooling_skills(),
+            "role_category_distribution": analyzer.role_category_distribution(),
+            "salary_percentiles": analyzer.salary_percentiles(),
+            "salary_by_category": analyzer.salary_by_category(),
+            "salary_by_seniority": analyzer.salary_by_seniority(),
+            "salary_divergence": analyzer.salary_divergence_check(),
+            "geographic_distribution": analyzer.geographic_distribution(),
+            "company_stage_distribution": analyzer.company_stage_distribution(),
         }
         print(json.dumps(report, indent=2))
     else:

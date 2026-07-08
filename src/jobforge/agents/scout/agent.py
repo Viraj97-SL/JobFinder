@@ -41,6 +41,7 @@ from jobforge.connectors.wellfound import WellfoundConnector
 from jobforge.memory.dedup_store import AnalyticsStore, DedupStore
 from jobforge.models.job import RawJob
 from jobforge.models.state import JobForgeState, ScoutMetadata
+from jobforge.utils.salary_parser import detect_salary_period
 
 logger = structlog.get_logger(__name__)
 
@@ -179,6 +180,22 @@ class ScoutAgent(DeepAgent):
             logger.info("scout.ats_discovered_via_career_pages", tokens=ats_discovered)
             # These tokens are logged for future manual addition to greenhouse_lever.py
             # (auto-fetching them here would duplicate ats_direct results)
+
+        # ── Salary Period Detection ─────────────────────────────────────────────
+        # UK boards mix annual salary, day rate, and hourly rate in the same
+        # salary_min/salary_max fields with no period marker. Detect it here so
+        # analytics can normalise to an annual-equivalent value downstream and
+        # never average a contractor day rate into the annual salary median.
+        all_jobs = [
+            job.model_copy(
+                update={
+                    "salary_period": detect_salary_period(
+                        f"{job.title} {job.description}", job.salary_min, job.salary_max
+                    )
+                }
+            )
+            for job in all_jobs
+        ]
 
         # ── Deduplication ──────────────────────────────────────────────────────
         dedup_store = DedupStore()
