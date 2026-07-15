@@ -26,6 +26,7 @@ from sqlalchemy.engine import Engine
 
 from jobforge.analytics.role_classifier import classify_role_category
 from jobforge.config.settings import settings
+from jobforge.models.report import MarketReport
 from jobforge.utils.geography import normalize_location
 from jobforge.utils.salary_parser import normalize_to_annual
 
@@ -213,11 +214,21 @@ def init_database() -> None:
             scraped_at TEXT NOT NULL
         )
         """,
+        f"""
+        CREATE TABLE IF NOT EXISTS market_report_archive (
+            {id_col},
+            generated_at TEXT NOT NULL,
+            window_days INTEGER NOT NULL,
+            report_json TEXT NOT NULL,
+            archived_at TEXT NOT NULL
+        )
+        """,
         "CREATE INDEX IF NOT EXISTS idx_seen_jobs_hash ON seen_jobs(dedup_hash)",
         "CREATE INDEX IF NOT EXISTS idx_score_history_run ON score_history(run_id)",
         "CREATE INDEX IF NOT EXISTS idx_score_cache_expires ON score_cache(expires_at)",
         "CREATE INDEX IF NOT EXISTS idx_job_analytics_run ON job_analytics(run_id)",
         "CREATE INDEX IF NOT EXISTS idx_job_analytics_scraped ON job_analytics(scraped_at)",
+        "CREATE INDEX IF NOT EXISTS idx_market_report_archive_generated ON market_report_archive(generated_at)",
     ]
 
     with engine.connect() as conn:
@@ -231,6 +242,10 @@ def init_database() -> None:
     _ensure_column(engine, "job_analytics", "salary_annual_max", "REAL", "REAL")
     _ensure_column(engine, "job_analytics", "role_category", "TEXT", "TEXT")
     _ensure_column(engine, "job_analytics", "region", "TEXT", "TEXT")
+    _ensure_column(engine, "job_analytics", "employer_is_licensed_sponsor", "INTEGER", "INTEGER")
+    _ensure_column(engine, "run_history", "total_after_dedup", "INTEGER", "INTEGER")
+    _ensure_column(engine, "run_history", "total_after_prescreen", "INTEGER", "INTEGER")
+    _ensure_column(engine, "run_history", "total_scored", "INTEGER", "INTEGER")
 
     logger.info("database.init.complete")
 
@@ -416,6 +431,77 @@ class RunHistory:
         pass
 
 
+class ReportArchive:
+    """
+    Append-only historical archive of published MarketReport snapshots (4.4).
+
+    Every archive() call INSERTs a new row — never UPDATE — so a past week's
+    published figures (skills, salary bands, sponsorship rates, etc.) can
+    always be reconstructed exactly as published, even as the live DB's
+    rolling windows move forward and MarketAnalyzer's live queries would
+    return different numbers for "last 90 days" today than they did then.
+    """
+
+    def __init__(self) -> None:
+        self._engine = get_engine()
+
+    def archive(self, report: MarketReport) -> None:
+        """Persist a snapshot of a fully-built MarketReport. Always inserts a new row."""
+        now = datetime.utcnow().isoformat()
+        with self._engine.connect() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO market_report_archive
+                        (generated_at, window_days, report_json, archived_at)
+                    VALUES (:generated_at, :window_days, :report_json, :archived_at)
+                """),
+                {
+                    "generated_at": report.metadata.generated_at.isoformat(),
+                    "window_days": report.metadata.window_days,
+                    "report_json": report.model_dump_json(),
+                    "archived_at": now,
+                },
+            )
+            conn.commit()
+
+    def get_latest(self) -> dict | None:
+        """Return the most recently archived report row, or None if the archive is empty."""
+        with self._engine.connect() as conn:
+            row = conn.execute(
+                text("""
+                    SELECT id, generated_at, window_days, report_json, archived_at
+                    FROM market_report_archive
+                    ORDER BY id DESC LIMIT 1
+                """)
+            ).fetchone()
+        return self._row_to_dict(row) if row is not None else None
+
+    def list_all(self) -> list[dict]:
+        """Return every archived report row, oldest first."""
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                text("""
+                    SELECT id, generated_at, window_days, report_json, archived_at
+                    FROM market_report_archive
+                    ORDER BY id ASC
+                """)
+            ).fetchall()
+        return [self._row_to_dict(row) for row in rows]
+
+    @staticmethod
+    def _row_to_dict(row) -> dict:
+        return {
+            "id": row[0],
+            "generated_at": row[1],
+            "window_days": row[2],
+            "report": json.loads(row[3]),
+            "archived_at": row[4],
+        }
+
+    def close(self) -> None:
+        pass
+
+
 class ScoreCache:
     """
     Persistent LLM score cache keyed on job content hash.
@@ -512,12 +598,12 @@ class AnalyticsStore:
                         (job_id, dedup_hash, run_id, title, company, location, source,
                          salary_min, salary_max, salary_period, salary_annual_min, salary_annual_max,
                          work_model, company_stage, is_startup, role_category, region,
-                         offers_sponsorship, matched_skills_json, scraped_at)
+                         offers_sponsorship, employer_is_licensed_sponsor, matched_skills_json, scraped_at)
                     VALUES
                         (:job_id, :dedup_hash, :run_id, :title, :company, :location, :source,
                          :salary_min, :salary_max, :salary_period, :salary_annual_min, :salary_annual_max,
                          :work_model, :company_stage, :is_startup, :role_category, :region,
-                         :offers_sponsorship, :matched_skills_json, :scraped_at)
+                         :offers_sponsorship, :employer_is_licensed_sponsor, :matched_skills_json, :scraped_at)
                     ON CONFLICT(job_id) DO NOTHING
                 """),
                 {
@@ -541,6 +627,10 @@ class AnalyticsStore:
                     "offers_sponsorship": (
                         1 if getattr(job, "offers_sponsorship", None) is True
                         else (0 if getattr(job, "offers_sponsorship", None) is False else None)
+                    ),
+                    "employer_is_licensed_sponsor": (
+                        1 if getattr(job, "employer_is_licensed_sponsor", None) is True
+                        else (0 if getattr(job, "employer_is_licensed_sponsor", None) is False else None)
                     ),
                     "matched_skills_json": json.dumps(matched_skills),
                     "scraped_at": now,

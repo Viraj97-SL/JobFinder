@@ -12,6 +12,8 @@ Deep Agent Capabilities:
 
 Connector inventory:
   Phase 1 (parallel): adzuna, reed, wellfound, linkedin_proxy, indeed_proxy,
+                       uk_gov_find_a_job (DWP Find a Job), hn_who_is_hiring
+                       (HN "Ask HN: Who is hiring?" thread),
                        ats_direct (Greenhouse/Lever/Ashby), funding_news,
                        recruiter_boards, career_pages (base watchlist)
   Phase 2 (serial):   career_pages re-run with funding_news discovered companies
@@ -28,15 +30,19 @@ import structlog
 
 from jobforge.agents.base import DeepAgent
 from jobforge.agents.scout.planner import SearchPlan, build_search_plan
+from jobforge.config.settings import settings
 from jobforge.connectors.adzuna import AdzunaConnector
 from jobforge.connectors.base import JobSourceConnector
 from jobforge.connectors.career_pages import CareerPagesConnector
 from jobforge.connectors.funding_news import FundingNewsConnector
 from jobforge.connectors.greenhouse_lever import GreenhouseLeverConnector
+from jobforge.connectors.hn_who_is_hiring import HNWhoIsHiringConnector
 from jobforge.connectors.indeed_proxy import IndeedProxyConnector
 from jobforge.connectors.linkedin_proxy import LinkedInProxyConnector
 from jobforge.connectors.recruiter_boards import RecruiterBoardsConnector
 from jobforge.connectors.reed import ReedConnector
+from jobforge.connectors.sponsor_register import SponsorRegisterMatcher, download_sponsor_register
+from jobforge.connectors.uk_gov_find_a_job import UkGovFindAJobConnector
 from jobforge.connectors.wellfound import WellfoundConnector
 from jobforge.memory.dedup_store import AnalyticsStore, DedupStore
 from jobforge.models.job import RawJob
@@ -81,6 +87,9 @@ class ScoutAgent(DeepAgent):
             "wellfound":       WellfoundConnector(),
             "linkedin_proxy":  LinkedInProxyConnector(),
             "indeed_proxy":    IndeedProxyConnector(),
+            # DWP "Find a Job" — best-effort scraper, see connector docstring
+            "uk_gov_find_a_job": UkGovFindAJobConnector(),
+            "hn_who_is_hiring":  HNWhoIsHiringConnector(),  # Monthly "who is hiring" HN thread
             # ── Deep discovery sources ──
             "ats_direct":       self._ats_connector,         # Greenhouse/Lever/Ashby JSON APIs
             "funding_news":     self._funding_connector,     # Newly-funded UK AI startups
@@ -196,6 +205,14 @@ class ScoutAgent(DeepAgent):
             )
             for job in all_jobs
         ]
+
+        # ── Sponsor Register Cross-Check (2.4) ──────────────────────────────────
+        # "JD mentions sponsorship" (NLP guess, above) vs "employer legally holds
+        # a sponsor licence" (verified against the Home Office register) are
+        # reported as distinct signals. Soft-fails: a download/parse error here
+        # must never take down the whole scrape.
+        if settings.pipeline.sponsor_register_enabled and all_jobs:
+            all_jobs = await self._apply_sponsor_register(all_jobs)
 
         # ── Deduplication ──────────────────────────────────────────────────────
         dedup_store = DedupStore()
@@ -337,3 +354,26 @@ class ScoutAgent(DeepAgent):
     ) -> list[RawJob]:
         """Execute search on a single connector with error handling."""
         return await connector.safe_search(queries=queries, location="UK")
+
+    async def _apply_sponsor_register(self, jobs: list[RawJob]) -> list[RawJob]:
+        """
+        Tag each job with employer_is_licensed_sponsor by cross-referencing
+        the cached UK sponsor register. Downloads/refreshes the register once
+        per run (not per job) — a failure here (no internet, GOV.UK page
+        changed) is logged and skipped rather than crashing the scrape.
+        """
+        try:
+            cache_path = await download_sponsor_register(
+                max_age_days=settings.pipeline.sponsor_register_cache_days
+            )
+            matcher = SponsorRegisterMatcher(cache_path)
+        except Exception as e:
+            logger.warning("scout.sponsor_register.unavailable", error=str(e))
+            return jobs
+
+        return [
+            job.model_copy(
+                update={"employer_is_licensed_sponsor": matcher.is_licensed_sponsor(job.company)}
+            )
+            for job in jobs
+        ]

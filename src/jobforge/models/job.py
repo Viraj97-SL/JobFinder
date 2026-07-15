@@ -43,6 +43,14 @@ class RawJob(BaseModel):
         default_factory=list,
         description="Extracted phrases: 'visa sponsorship available', 'Skilled Worker', etc."
     )
+    employer_is_licensed_sponsor: bool | None = Field(
+        default=None,
+        description=(
+            "True if the employer holds a UK Home Office Worker/Temporary Worker "
+            "sponsor licence per the public Register of Licensed Sponsors — distinct "
+            "from offers_sponsorship, which is only an NLP guess from JD text."
+        ),
+    )
 
     scraped_at: datetime = Field(default_factory=datetime.utcnow)
 

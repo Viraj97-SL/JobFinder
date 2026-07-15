@@ -5,9 +5,9 @@ Generates optimised search queries for each job source based on
 target roles, skills, and startup focus areas.
 
 Sources and their query strategies:
-  adzuna / reed         → primary role × location queries
-  wellfound             → startup-focused + primary
-  career_pages          → skill-specific (used as keyword filters)
+  adzuna / reed / uk_gov_find_a_job → primary role × location queries
+  wellfound                        → startup-focused + primary
+  career_pages / hn_who_is_hiring   → skill-specific (used as keyword filters)
   ats_direct            → no queries needed (uses internal ATS token discovery)
   funding_news          → no queries needed (uses internal news queries)
   recruiter_boards      → no queries needed (uses internal agency queries)
@@ -41,14 +41,15 @@ class SearchPlan:
         """Get queries optimised for a specific source."""
         if source in ("wellfound", "yc_startup"):
             return self.startup_queries + self.primary_queries[:3]
-        elif source == "career_pages":
-            # Career pages use queries as keyword filters — skill-specific works best
+        elif source in ("career_pages", "hn_who_is_hiring"):
+            # Career pages and the HN thread both use queries as keyword
+            # filters (not literal search terms) — skill-specific works best
             return self.skill_specific_queries + self.primary_queries[:3]
         elif source in ("ats_direct", "funding_news", "recruiter_boards"):
             # These connectors have their own internal query logic
             return []
         else:
-            # adzuna, reed, indeed_proxy, linkedin_proxy
+            # adzuna, reed, indeed_proxy, linkedin_proxy, uk_gov_find_a_job
             return self.primary_queries + self.startup_queries[:3]
 
 
@@ -155,6 +156,8 @@ def build_search_plan(
             "wellfound",
             "linkedin_proxy",
             "indeed_proxy",
+            "uk_gov_find_a_job",  # DWP Find a Job — best-effort, see connector docstring
+            "hn_who_is_hiring",   # Monthly "Ask HN: Who is hiring?" thread
             "career_pages",
             "ats_direct",         # Greenhouse + Lever + Ashby
             "funding_news",       # Newly-funded startup discovery

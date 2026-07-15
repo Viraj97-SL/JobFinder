@@ -29,6 +29,20 @@ from jobforge.models.state import JobForgeState
 
 logger = structlog.get_logger(__name__)
 
+_FORMULA_PREFIX_CHARS = ("=", "+", "-", "@")
+
+
+def _excel_safe(value: str) -> str:
+    """
+    Neutralise CSV/formula injection: some connectors (e.g. the HN "Who is
+    hiring" thread) surface fully anonymous, attacker-writable free text into
+    title/company/skill fields. Excel/LibreOffice may interpret a cell
+    starting with =, +, -, or @ as a formula when the digest is opened.
+    """
+    if value and value[0] in _FORMULA_PREFIX_CHARS:
+        return f"'{value}"
+    return value
+
 
 class DispatcherAgent(BaseAgent):
     """Packages the daily digest Excel + tailored CVs and sends via email."""
@@ -92,12 +106,12 @@ class DispatcherAgent(BaseAgent):
             rows.append({
                 "Rank": rank,
                 "Match %": round(job.overall_score, 1),
-                "Job Title": job.job.title,
-                "Company": f"{job.job.company} [{job.job.company_stage}]" if job.job.company_stage and job.job.company_stage != "unknown" else job.job.company,
-                "Location": f"{job.job.location}, {job.job.work_model or ''}".strip(", "),
+                "Job Title": _excel_safe(job.job.title),
+                "Company": _excel_safe(f"{job.job.company} [{job.job.company_stage}]" if job.job.company_stage and job.job.company_stage != "unknown" else job.job.company),
+                "Location": _excel_safe(f"{job.job.location}, {job.job.work_model or ''}".strip(", ")),
                 "Salary": job.job.salary_display,
-                "Key Match Reasons": ", ".join(job.key_matching_skills[:3]),
-                "Gaps": ", ".join(job.key_gaps[:3]) if job.key_gaps else "None identified",
+                "Key Match Reasons": _excel_safe(", ".join(job.key_matching_skills[:3])),
+                "Gaps": _excel_safe(", ".join(job.key_gaps[:3]) if job.key_gaps else "None identified"),
                 "CV Variant": cv.variant_used if cv else "—",
                 "Visa": job.visa_tag,
                 "Startup": "Yes" if job.job.is_startup else "",

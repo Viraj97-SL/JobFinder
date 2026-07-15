@@ -27,7 +27,7 @@ class LLMSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="LLM_", env_file=_ENV_FILE, extra="ignore")
 
     gemini_api_key: str = Field(validation_alias="GEMINI_API_KEY")
-    fast_model: str = "gemini-2.0-flash"
+    fast_model: str = "gemini-2.5-flash"
     deep_model: str = "gemini-2.5-pro"
     cost_cap_usd: float = 2.00
     temperature: float = 0.1
@@ -48,6 +48,11 @@ class JobSourceSettings(BaseSettings):
     adzuna_daily_quota: int = 200
     reed_daily_quota: int = 400
     tavily_daily_quota: int = 100
+    # DWP "Find a Job" has no public API and its live successor
+    # (jobs.service.gov.uk) sits behind Akamai bot-protection — see
+    # connectors/uk_gov_find_a_job.py module docstring. Kept conservative
+    # since it is best-effort HTML scraping, not a stable partner API.
+    uk_gov_find_a_job_daily_quota: int = 60
 
 
 class VisaSettings(BaseSettings):
@@ -98,6 +103,10 @@ class PipelineSettings(BaseSettings):
     # ML pre-screen gate (runs before LLM, cuts ~50% of calls)
     ml_prescreen_enabled: bool = True
     ml_prescreen_threshold: float = 0.30  # Weighted ensemble cutoff [0, 1]
+    # UK sponsor register cross-check (2.4) — verifies employers actually hold
+    # a Home Office sponsor licence, distinct from JD-stated sponsorship.
+    sponsor_register_enabled: bool = True
+    sponsor_register_cache_days: int = 7  # Register updates frequently; refresh weekly
     # RAG few-shot context for Tailor Agent
     rag_enabled: bool = True
     rag_top_k: int = 3  # Number of similar past tailoring examples to retrieve

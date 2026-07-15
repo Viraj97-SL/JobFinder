@@ -20,7 +20,7 @@ from pathlib import Path
 # Make sure the src package is importable when run from project root
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from jobforge.memory.dedup_store import init_database
+from jobforge.memory.dedup_store import ReportArchive, init_database
 from jobforge.analytics.market_analyzer import MarketAnalyzer
 
 
@@ -28,37 +28,26 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="JobForge AI — Market Intelligence Report")
     parser.add_argument("--days", type=int, default=90, help="Lookback window in days (default: 90)")
     parser.add_argument("--json", action="store_true", help="Output structured JSON instead of text")
+    parser.add_argument(
+        "--archive",
+        action="store_true",
+        help="Persist this report snapshot to market_report_archive (append-only) before printing",
+    )
     args = parser.parse_args()
 
     init_database()
     analyzer = MarketAnalyzer(lookback_days=args.days)
 
-    if args.json:
-        report = {
-            "top_skills": analyzer.top_demanded_skills(15),
-            "work_model": analyzer.work_model_distribution(),
-            "salary": analyzer.salary_stats(),
-            "sponsorship": analyzer.sponsorship_rate(),
-            "startup_ratio": analyzer.startup_ratio(),
-            "top_companies": analyzer.top_hiring_companies(10),
-            "source_breakdown": analyzer.source_breakdown(),
-            "score_trend": analyzer.score_trend(),
-            "cv_variants": analyzer.cv_variant_distribution(),
-            "deltas": {
-                metric: analyzer.metric_deltas(metric, weeks=1)
-                for metric in ("total_volume", "sponsorship_rate", "startup_share", "salary_median")
-            },
-            "skill_trajectories": analyzer.skill_trajectories(),
-            "rising_cooling_skills": analyzer.rising_cooling_skills(),
-            "role_category_distribution": analyzer.role_category_distribution(),
-            "salary_percentiles": analyzer.salary_percentiles(),
-            "salary_by_category": analyzer.salary_by_category(),
-            "salary_by_seniority": analyzer.salary_by_seniority(),
-            "salary_divergence": analyzer.salary_divergence_check(),
-            "geographic_distribution": analyzer.geographic_distribution(),
-            "company_stage_distribution": analyzer.company_stage_distribution(),
-        }
-        print(json.dumps(report, indent=2))
+    if args.json or args.archive:
+        report = analyzer.build_market_report()
+
+        if args.archive:
+            ReportArchive().archive(report)
+
+        if args.json:
+            print(json.dumps(report.model_dump(mode="json"), indent=2))
+        else:
+            print(analyzer.generate_text_report())
     else:
         print(analyzer.generate_text_report())
 

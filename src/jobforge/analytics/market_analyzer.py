@@ -11,8 +11,9 @@ Usage:
 
 from __future__ import annotations
 
+import itertools
 import json
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -21,8 +22,13 @@ from sqlalchemy import text
 
 from jobforge.analytics.role_classifier import classify_seniority
 from jobforge.analytics.trends import classify_rising_cooling, classify_trend, week_start
-from jobforge.analytics.validation import DEFAULT_DIVERGENCE_THRESHOLD, check_salary_divergence
+from jobforge.analytics.validation import (
+    DEFAULT_DIVERGENCE_THRESHOLD,
+    check_salary_divergence,
+    enforce_min_sample,
+)
 from jobforge.memory.dedup_store import get_engine
+from jobforge.models.report import MarketReport, ReportMetadata
 from jobforge.utils.geography import normalize_location
 
 logger = structlog.get_logger(__name__)
@@ -33,6 +39,7 @@ class MarketAnalyzer:
 
     def __init__(self, lookback_days: int = 90) -> None:
         self._engine = get_engine()
+        self._lookback_days = lookback_days
         self._cutoff = (datetime.utcnow() - timedelta(days=lookback_days)).isoformat()
 
     # ── Data Loaders ─────────────────────────────────────────────────────────
@@ -417,6 +424,31 @@ class MarketAnalyzer:
             "unknown": unknown,
         }
 
+    def sponsor_register_rate(self) -> dict[str, object]:
+        """
+        Percentage of roles at employers who *actually hold* a UK Home Office
+        sponsor licence (2.4) — cross-referenced against the public Register
+        of Licensed Sponsors, not inferred from JD text. Reported separately
+        from sponsorship_rate() (JD-stated), since an employer can hold a
+        licence without mentioning it, and mentioning it isn't proof of one.
+        """
+        df = self._load_jobs()
+        if df.empty or "employer_is_licensed_sponsor" not in df.columns:
+            return {}
+
+        total = len(df)
+        licensed = int((df["employer_is_licensed_sponsor"] == 1).sum())
+        not_licensed = int((df["employer_is_licensed_sponsor"] == 0).sum())
+        unknown = total - licensed - not_licensed
+
+        return {
+            "total": total,
+            "licensed_sponsor": licensed,
+            "licensed_sponsor_pct": round(100 * licensed / total, 1) if total else 0,
+            "not_licensed": not_licensed,
+            "unknown": unknown,
+        }
+
     def startup_ratio(self) -> dict[str, object]:
         """Ratio of startup vs established company postings."""
         df = self._load_jobs()
@@ -477,6 +509,274 @@ class MarketAnalyzer:
         counts = df["cv_variant"].dropna().value_counts().to_dict()
         return {str(k): int(v) for k, v in counts.items()}
 
+    # ── Advanced Insights (3.1 - 3.4) ────────────────────────────────────────
+
+    def skill_co_occurrence(self, top_n: int = 15, min_count: int = 3) -> list[dict]:
+        """
+        Top skill pairs that co-occur in the same job posting (3.1) — answers
+        "what stack should I actually learn" better than a flat ranked list,
+        e.g. RAG appearing with LangChain + PostgreSQL + FastAPI most of the time.
+
+        Pairs below min_count are dropped so a single unusual posting can't
+        manufacture a "trend" out of noise.
+        """
+        df = self._load_jobs()
+        if df.empty or "matched_skills_json" not in df.columns:
+            return []
+
+        pair_counter: Counter = Counter()
+        for raw in df["matched_skills_json"].dropna():
+            try:
+                skills = sorted(set(json.loads(raw)))
+            except (json.JSONDecodeError, TypeError):
+                continue
+            pair_counter.update(itertools.combinations(skills, 2))
+
+        return [
+            {"skills": list(pair), "count": count}
+            for pair, count in pair_counter.most_common(top_n)
+            if count >= min_count
+        ]
+
+    def posting_persistence(self) -> dict[str, dict[str, float]]:
+        """
+        Median days a role stays visible on the market, segmented by
+        role_category (3.2) — roles that keep reappearing across pipeline
+        runs (seen_jobs.first_seen_at → last_seen_at) are a genuine
+        market-tightness signal, not just noise.
+        """
+        with self._engine.connect() as conn:
+            df = pd.read_sql(
+                text("""
+                    SELECT sj.first_seen_at, sj.last_seen_at, ja.role_category
+                    FROM seen_jobs sj
+                    JOIN job_analytics ja ON ja.dedup_hash = sj.dedup_hash
+                    WHERE ja.scraped_at >= :cutoff
+                """),
+                conn,
+                params={"cutoff": self._cutoff},
+            )
+        if df.empty:
+            return {}
+
+        days_on_market = (
+            pd.to_datetime(df["last_seen_at"]) - pd.to_datetime(df["first_seen_at"])
+        ).dt.total_seconds() / 86400
+
+        result: dict[str, dict[str, float]] = {}
+        for category, group_days in days_on_market.groupby(df["role_category"].fillna("Other")):
+            result[str(category)] = {
+                "median_days": round(float(group_days.median()), 1),
+                "n": int(len(group_days)),
+            }
+        return result
+
+    def salary_by_skill(self, min_n: int = 15) -> dict[str, dict[str, float]]:
+        """
+        Median annual-salary premium/discount for roles requiring each skill,
+        vs the overall market median (3.3). Skills with fewer than min_n
+        disclosed-salary postings are omitted outright — a small sample
+        shouldn't publish a precise-looking premium.
+        """
+        df = self._load_jobs()
+        market_midpoints = self._annual_midpoints(df)
+        if market_midpoints.empty or "matched_skills_json" not in df.columns:
+            return {}
+        market_median = float(market_midpoints.median())
+
+        annual = df[df["salary_period"] == "annual"].copy()
+        annual["midpoint"] = annual[["salary_annual_min", "salary_annual_max"]].mean(axis=1, skipna=True)
+        annual = annual.dropna(subset=["midpoint"])
+
+        skill_midpoints: dict[str, list[float]] = defaultdict(list)
+        for raw, midpoint in zip(annual["matched_skills_json"], annual["midpoint"]):
+            try:
+                skills = json.loads(raw) if raw else []
+            except (json.JSONDecodeError, TypeError):
+                continue
+            for skill in set(skills):
+                skill_midpoints[skill].append(midpoint)
+
+        result: dict[str, dict[str, float]] = {}
+        for skill, values in skill_midpoints.items():
+            if len(values) < min_n:
+                continue
+            skill_median = float(pd.Series(values).median())
+            premium_pct = round(100 * (skill_median - market_median) / market_median, 1) if market_median else None
+            result[skill] = {
+                "n": len(values),
+                "median_salary": round(skill_median, 0),
+                "market_median": round(market_median, 0),
+                "premium_pct": premium_pct,
+            }
+        return result
+
+    def work_model_trend(self, lookback_weeks: int = 12) -> dict[str, list[int]]:
+        """
+        Weekly remote/hybrid/onsite split over the lookback window (3.4) —
+        the trajectory (is remote shrinking?) rather than just a current
+        snapshot, using the same weekly-bucketing approach as skill trends.
+        """
+        df = self._load_jobs()
+        if df.empty or "work_model" not in df.columns:
+            return {}
+
+        cutoff = datetime.utcnow() - timedelta(weeks=lookback_weeks)
+        scraped = pd.to_datetime(df["scraped_at"])
+        df = df[scraped >= cutoff].copy()
+        if df.empty:
+            return {}
+
+        df["week"] = pd.to_datetime(df["scraped_at"]).apply(lambda ts: week_start(ts.to_pydatetime()))
+        df["work_model"] = df["work_model"].fillna("unknown")
+
+        all_weeks = sorted(df["week"].unique())
+        result: dict[str, list[int]] = {}
+        for model in sorted(df["work_model"].unique()):
+            counts_by_week = df[df["work_model"] == model].groupby("week").size()
+            result[model] = [int(counts_by_week.get(w, 0)) for w in all_weeks]
+        return result
+
+    # ── Pipeline Funnel Observability (5.3) ─────────────────────────────────
+
+    _FUNNEL_STAGES = (
+        "total_scraped",
+        "total_after_dedup",
+        "total_after_prescreen",
+        "total_scored",
+        "total_qualified",
+    )
+
+    def pipeline_funnel(self, lookback_runs: int = 10) -> dict:
+        """
+        Per-run pipeline funnel (scraped -> dedup -> prescreen -> scored ->
+        qualified) with drop-rate percentages between consecutive stages,
+        plus an aggregate/average across the lookback window (5.3).
+
+        Stage columns that a given run never populated (e.g. older runs
+        predating this instrumentation, or a run where the prescreen gate
+        was disabled) come back as None rather than a misleading 0/100%
+        drop rate.
+        """
+        stages = self._FUNNEL_STAGES
+        stage_pairs = list(zip(stages, stages[1:]))
+
+        with self._engine.connect() as conn:
+            df = pd.read_sql(
+                text(f"""
+                    SELECT run_id, started_at, {", ".join(stages)}
+                    FROM run_history
+                    WHERE status = 'complete'
+                    ORDER BY started_at DESC
+                    LIMIT :n
+                """),
+                conn,
+                params={"n": lookback_runs},
+            )
+
+        empty_aggregate = {"counts": {}, "drop_rates": {}, "n_runs": 0}
+        if df.empty:
+            return {"runs": [], "aggregate": empty_aggregate}
+
+        def _stage_counts(row: pd.Series) -> dict[str, int | None]:
+            return {stage: (int(row[stage]) if pd.notna(row[stage]) else None) for stage in stages}
+
+        def _drop_rates(counts: dict[str, int | None]) -> dict[str, float | None]:
+            rates: dict[str, float | None] = {}
+            for frm, to in stage_pairs:
+                key = f"{frm}_to_{to}"
+                frm_val, to_val = counts[frm], counts[to]
+                if not frm_val or to_val is None:
+                    rates[key] = None
+                    continue
+                rates[key] = round(100 * (frm_val - to_val) / frm_val, 1)
+            return rates
+
+        runs: list[dict] = []
+        for _, row in df.iterrows():
+            counts = _stage_counts(row)
+            runs.append({
+                "run_id": row["run_id"],
+                "started_at": row["started_at"],
+                "counts": counts,
+                "drop_rates": _drop_rates(counts),
+            })
+
+        aggregate_counts = {
+            stage: (round(float(df[stage].dropna().mean()), 1) if df[stage].notna().any() else None)
+            for stage in stages
+        }
+        aggregate_drop_rates: dict[str, float | None] = {}
+        for frm, to in stage_pairs:
+            key = f"{frm}_to_{to}"
+            values = [r["drop_rates"][key] for r in runs if r["drop_rates"][key] is not None]
+            aggregate_drop_rates[key] = round(sum(values) / len(values), 1) if values else None
+
+        return {
+            "runs": runs,
+            "aggregate": {
+                "counts": aggregate_counts,
+                "drop_rates": aggregate_drop_rates,
+                "n_runs": len(runs),
+            },
+        }
+
+    # ── Structured Report (4.1) ──────────────────────────────────────────────
+
+    def build_market_report(self) -> MarketReport:
+        """
+        Assemble the single schema-validated MarketReport that the LinkedIn
+        carousel, email digest, and marketforge.digital should all consume,
+        instead of each surface re-deriving figures from separate method
+        calls (which is how the salary-median divergence shipped
+        inconsistently before). Percentile figures below the minimum sample
+        size are suppressed via enforce_min_sample (4.3).
+        """
+        divergence = self.salary_divergence_check()
+
+        return MarketReport(
+            metadata=ReportMetadata(
+                generated_at=datetime.utcnow(),
+                window_days=self._lookback_days,
+                total_jobs=int(len(self._load_jobs())),
+                divergence_flagged=bool(divergence["diverges"]),
+            ),
+            top_skills=self.top_demanded_skills(15),
+            work_model=self.work_model_distribution(),
+            sponsorship=self.sponsorship_rate(),
+            sponsor_register=self.sponsor_register_rate(),
+            startup_ratio=self.startup_ratio(),
+            top_companies=self.top_hiring_companies(10),
+            source_breakdown=self.source_breakdown(),
+            score_trend=self.score_trend(),
+            cv_variants=self.cv_variant_distribution(),
+            salary=self.salary_stats(),
+            salary_percentiles=enforce_min_sample(self.salary_percentiles()),
+            salary_by_category={
+                category: enforce_min_sample(percentiles)
+                for category, percentiles in self.salary_by_category().items()
+            },
+            salary_by_seniority={
+                level: enforce_min_sample(percentiles)
+                for level, percentiles in self.salary_by_seniority().items()
+            },
+            salary_divergence=divergence,
+            deltas={
+                metric: self.metric_deltas(metric, weeks=1)
+                for metric in ("total_volume", "sponsorship_rate", "startup_share", "salary_median")
+            },
+            skill_trajectories=self.skill_trajectories(),
+            rising_cooling_skills=self.rising_cooling_skills(),
+            role_category_distribution=self.role_category_distribution(),
+            geographic_distribution=self.geographic_distribution(),
+            company_stage_distribution=self.company_stage_distribution(),
+            skill_co_occurrence=self.skill_co_occurrence(),
+            posting_persistence=self.posting_persistence(),
+            salary_by_skill=self.salary_by_skill(),
+            work_model_trend=self.work_model_trend(),
+            funnel=self.pipeline_funnel(),
+        )
+
     # ── Report Generator ─────────────────────────────────────────────────────
 
     def generate_text_report(self) -> str:
@@ -518,6 +818,14 @@ class MarketAnalyzer:
             lines.append(f"  Offering sponsorship: {sp['sponsoring']} ({sp['sponsoring_pct']}%)")
             lines.append(f"  Citizens only:        {sp['citizens_only']}")
             lines.append(f"  Unknown/not stated:   {sp['unknown']}")
+
+        # Sponsor register cross-check (2.4)
+        srr = self.sponsor_register_rate()
+        if srr.get("total", 0) > 0:
+            lines.append(f"\nVerified Sponsor Licence (Home Office register, n={srr['total']}):")
+            lines.append(
+                f"  Licensed sponsor: {srr['licensed_sponsor']} ({srr['licensed_sponsor_pct']}%)"
+            )
 
         # Startup ratio
         sr = self.startup_ratio()

@@ -26,6 +26,9 @@ data/jobforge.db
 data/jobforge.db-wal
 data/jobforge.db-shm
 
+# Downloaded reference data (re-fetched, not committed)
+data/cache/
+
 # OS
 .DS_Store
 Thumbs.db

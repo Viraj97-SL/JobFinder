@@ -92,6 +92,7 @@ def _insert_row(job_id: str, scraped_at: datetime, **overrides) -> None:
         "role_category": "AI/LLM Engineer",
         "region": "London",
         "offers_sponsorship": None,
+        "employer_is_licensed_sponsor": None,
         "matched_skills_json": "[]",
         "scraped_at": scraped_at.isoformat(),
     }
@@ -103,12 +104,12 @@ def _insert_row(job_id: str, scraped_at: datetime, **overrides) -> None:
                     (job_id, dedup_hash, run_id, title, company, location, source,
                      salary_min, salary_max, salary_period, salary_annual_min, salary_annual_max,
                      work_model, company_stage, is_startup, role_category, region,
-                     offers_sponsorship, matched_skills_json, scraped_at)
+                     offers_sponsorship, employer_is_licensed_sponsor, matched_skills_json, scraped_at)
                 VALUES
                     (:job_id, :dedup_hash, :run_id, :title, :company, :location, :source,
                      :salary_min, :salary_max, :salary_period, :salary_annual_min, :salary_annual_max,
                      :work_model, :company_stage, :is_startup, :role_category, :region,
-                     :offers_sponsorship, :matched_skills_json, :scraped_at)
+                     :offers_sponsorship, :employer_is_licensed_sponsor, :matched_skills_json, :scraped_at)
             """),
             row,
         )
@@ -297,6 +298,241 @@ class TestGeographyAndCompanyStage:
 
         assert dist["series_a"] == 2
         assert dist["enterprise"] == 1
+
+
+def _insert_seen_job(dedup_hash: str, first_seen_at: datetime, last_seen_at: datetime, times_seen: int = 1) -> None:
+    with get_engine().connect() as conn:
+        conn.execute(
+            text("""
+                INSERT INTO seen_jobs
+                    (dedup_hash, job_id, title, company, source, first_seen_at, last_seen_at, times_seen)
+                VALUES (:h, :h, 'AI Engineer', 'Acme', 'adzuna', :first, :last, :times)
+            """),
+            {"h": dedup_hash, "first": first_seen_at.isoformat(), "last": last_seen_at.isoformat(), "times": times_seen},
+        )
+        conn.commit()
+
+
+class TestSkillCoOccurrence:
+    def test_top_pairs_meeting_min_count(self, isolated_db):
+        now = datetime.utcnow()
+        for i in range(3):
+            _insert_row(f"j{i}", now, matched_skills_json=json.dumps(["Python", "LangChain", "PostgreSQL"]))
+        _insert_row("solo", now, matched_skills_json=json.dumps(["Rust"]))
+
+        pairs = MarketAnalyzer().skill_co_occurrence(min_count=3)
+
+        pair_sets = [set(p["skills"]) for p in pairs]
+        assert {"Python", "LangChain"} in pair_sets
+        assert {"Python", "PostgreSQL"} in pair_sets
+
+    def test_pairs_below_min_count_excluded(self, isolated_db):
+        now = datetime.utcnow()
+        _insert_row("j1", now, matched_skills_json=json.dumps(["Rust", "Kubernetes"]))
+
+        pairs = MarketAnalyzer().skill_co_occurrence(min_count=3)
+
+        assert pairs == []
+
+
+class TestPostingPersistence:
+    def test_median_days_by_category(self, isolated_db):
+        now = datetime.utcnow()
+        _insert_row("j1", now, role_category="MLOps")
+        _insert_seen_job("hash_j1", now - timedelta(days=10), now)
+
+        _insert_row("j2", now, role_category="Data Scientist")
+        _insert_seen_job("hash_j2", now - timedelta(days=2), now)
+
+        result = MarketAnalyzer().posting_persistence()
+
+        assert result["MLOps"]["median_days"] == pytest.approx(10.0, abs=0.1)
+        assert result["Data Scientist"]["median_days"] == pytest.approx(2.0, abs=0.1)
+
+
+class TestSalaryBySkill:
+    def test_skill_meeting_min_n_shows_premium(self, isolated_db):
+        now = datetime.utcnow()
+        for i in range(15):
+            _insert_row(f"base_{i}", now, salary_period="annual",
+                        salary_annual_min=50000, salary_annual_max=50000,
+                        matched_skills_json=json.dumps(["Python"]))
+        for i in range(15):
+            _insert_row(f"k8s_{i}", now, salary_period="annual",
+                        salary_annual_min=90000, salary_annual_max=90000,
+                        matched_skills_json=json.dumps(["Kubernetes"]))
+
+        result = MarketAnalyzer().salary_by_skill(min_n=15)
+
+        assert result["Kubernetes"]["n"] == 15
+        assert result["Kubernetes"]["premium_pct"] > 0
+
+    def test_skill_below_min_n_suppressed(self, isolated_db):
+        now = datetime.utcnow()
+        for i in range(3):
+            _insert_row(f"j_{i}", now, salary_period="annual",
+                        salary_annual_min=90000, salary_annual_max=90000,
+                        matched_skills_json=json.dumps(["RareSkill"]))
+
+        result = MarketAnalyzer().salary_by_skill(min_n=15)
+
+        assert "RareSkill" not in result
+
+
+class TestWorkModelTrend:
+    def test_weekly_split_by_model(self, isolated_db):
+        now = datetime.utcnow()
+        _insert_row("r1", now - timedelta(days=1), work_model="remote")
+        _insert_row("r2", now - timedelta(days=2), work_model="remote")
+        _insert_row("h1", now - timedelta(days=8), work_model="hybrid")
+
+        result = MarketAnalyzer(lookback_days=30).work_model_trend(lookback_weeks=4)
+
+        assert "remote" in result
+        assert "hybrid" in result
+        assert sum(result["remote"]) == 2
+        assert sum(result["hybrid"]) == 1
+
+
+class TestSponsorRegisterRate:
+    def test_reports_licensed_vs_not_vs_unknown_separately(self, isolated_db):
+        _insert_row("j1", datetime.utcnow(), employer_is_licensed_sponsor=1)
+        _insert_row("j2", datetime.utcnow(), employer_is_licensed_sponsor=1)
+        _insert_row("j3", datetime.utcnow(), employer_is_licensed_sponsor=0)
+        _insert_row("j4", datetime.utcnow(), employer_is_licensed_sponsor=None)
+
+        result = MarketAnalyzer().sponsor_register_rate()
+
+        assert result["total"] == 4
+        assert result["licensed_sponsor"] == 2
+        assert result["licensed_sponsor_pct"] == 50.0
+        assert result["not_licensed"] == 1
+        assert result["unknown"] == 1
+
+    def test_distinct_from_jd_stated_sponsorship(self, isolated_db):
+        """An employer can hold a licence without the JD mentioning it, and vice versa."""
+        _insert_row(
+            "j1", datetime.utcnow(),
+            offers_sponsorship=None,  # JD doesn't mention it
+            employer_is_licensed_sponsor=1,  # but the register says they hold a licence
+        )
+
+        sponsorship = MarketAnalyzer().sponsorship_rate()
+        register = MarketAnalyzer().sponsor_register_rate()
+
+        assert sponsorship["sponsoring"] == 0
+        assert register["licensed_sponsor"] == 1
+
+
+def _insert_run(run_id: str, started_at: datetime, **overrides) -> None:
+    row = {
+        "run_id": run_id,
+        "started_at": started_at.isoformat(),
+        "completed_at": started_at.isoformat(),
+        "status": "complete",
+        "total_scraped": None,
+        "total_after_dedup": None,
+        "total_after_prescreen": None,
+        "total_scored": None,
+        "total_qualified": None,
+    }
+    row.update(overrides)
+    with get_engine().connect() as conn:
+        conn.execute(
+            text("""
+                INSERT INTO run_history
+                    (run_id, started_at, completed_at, status, total_scraped,
+                     total_after_dedup, total_after_prescreen, total_scored, total_qualified)
+                VALUES
+                    (:run_id, :started_at, :completed_at, :status, :total_scraped,
+                     :total_after_dedup, :total_after_prescreen, :total_scored, :total_qualified)
+            """),
+            row,
+        )
+        conn.commit()
+
+
+class TestPipelineFunnel:
+    """
+    Funnel: scraped -> dedup -> prescreen -> scored -> qualified (5.3).
+    Drop rate between consecutive stages is 100 * (from - to) / from.
+    """
+
+    def test_drop_rate_math_single_run(self, isolated_db):
+        _insert_run(
+            "run1", datetime.utcnow(),
+            total_scraped=100, total_after_dedup=80,
+            total_after_prescreen=40, total_scored=40, total_qualified=10,
+        )
+
+        funnel = MarketAnalyzer().pipeline_funnel(lookback_runs=10)
+
+        assert len(funnel["runs"]) == 1
+        run = funnel["runs"][0]
+        assert run["counts"] == {
+            "total_scraped": 100,
+            "total_after_dedup": 80,
+            "total_after_prescreen": 40,
+            "total_scored": 40,
+            "total_qualified": 10,
+        }
+        assert run["drop_rates"]["total_scraped_to_total_after_dedup"] == 20.0
+        assert run["drop_rates"]["total_after_dedup_to_total_after_prescreen"] == 50.0
+        assert run["drop_rates"]["total_after_prescreen_to_total_scored"] == 0.0
+        assert run["drop_rates"]["total_scored_to_total_qualified"] == 75.0
+
+    def test_aggregate_averages_counts_and_drop_rates_across_runs(self, isolated_db):
+        now = datetime.utcnow()
+        _insert_run(
+            "run1", now - timedelta(days=1),
+            total_scraped=100, total_after_dedup=50,
+            total_after_prescreen=50, total_scored=50, total_qualified=50,
+        )
+        _insert_run(
+            "run2", now,
+            total_scraped=200, total_after_dedup=100,
+            total_after_prescreen=100, total_scored=100, total_qualified=100,
+        )
+
+        funnel = MarketAnalyzer().pipeline_funnel(lookback_runs=10)
+
+        assert funnel["aggregate"]["n_runs"] == 2
+        assert funnel["aggregate"]["counts"]["total_scraped"] == 150.0
+        # Both runs drop 50% scraped -> dedup, so the average must also be 50%.
+        assert funnel["aggregate"]["drop_rates"]["total_scraped_to_total_after_dedup"] == 50.0
+
+    def test_missing_stage_counts_yield_none_drop_rate_not_zero(self, isolated_db):
+        """A run that predates this instrumentation shouldn't fake a 0%/100% drop."""
+        _insert_run(
+            "run1", datetime.utcnow(),
+            total_scraped=100, total_after_dedup=None,
+            total_after_prescreen=None, total_scored=None, total_qualified=None,
+        )
+
+        funnel = MarketAnalyzer().pipeline_funnel(lookback_runs=10)
+
+        run = funnel["runs"][0]
+        assert run["counts"]["total_after_dedup"] is None
+        assert run["drop_rates"]["total_scraped_to_total_after_dedup"] is None
+        assert funnel["aggregate"]["counts"]["total_after_dedup"] is None
+
+    def test_empty_run_history_returns_empty_funnel(self, isolated_db):
+        funnel = MarketAnalyzer().pipeline_funnel()
+
+        assert funnel == {"runs": [], "aggregate": {"counts": {}, "drop_rates": {}, "n_runs": 0}}
+
+    def test_lookback_runs_limits_window(self, isolated_db):
+        now = datetime.utcnow()
+        for i in range(15):
+            _insert_run(
+                f"run{i}", now - timedelta(days=i),
+                total_scraped=10, total_after_dedup=10,
+                total_after_prescreen=10, total_scored=10, total_qualified=10,
+            )
+
+        funnel = MarketAnalyzer().pipeline_funnel(lookback_runs=5)
+
+        assert len(funnel["runs"]) == 5
 
 
 class TestRisingCoolingSkills:

@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -e .[dev]
+
+      - name: Lint (ruff)
+        # Pre-existing lint debt across the codebase is out of scope for this gate.
+        # --exit-zero keeps this step informational (non-blocking) while still
+        # surfacing violations in the CI log.
+        run: ruff check --exit-zero src/ tests/
+
+      - name: Test with coverage gate
+        # Coverage is scoped to the analytics package and the dedup store, the
+        # modules the Phase 5 hardening pass targeted. --cov-fail-under=70 turns
+        # a coverage drop below the plan's 70% bar into a hard CI failure.
+        #
+        # NOTE: directory-based --cov targets are used (not a single-file path
+        # for dedup_store.py) because this codebase has a dual-import-path quirk
+        # (some tests import `jobforge.X`, others `src.jobforge.X`) that makes
+        # single-file `--cov=path/to/file.py` targeting silently fail to
+        # instrument the module in some cases. Directory-based targets measure
+        # reliably regardless of which import path a given test uses.
+        # `src/jobforge/memory/rag_store.py` is excluded via [tool.coverage.run]
+        # omit in pyproject.toml since it is out of scope for this gate.
+        run: >
+          pytest
+          --cov=src/jobforge/analytics
+          --cov=src/jobforge/memory
+          --cov-report=term-missing
+          --cov-fail-under=70
