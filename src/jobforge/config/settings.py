@@ -27,8 +27,8 @@ class LLMSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="LLM_", env_file=_ENV_FILE, extra="ignore")
 
     gemini_api_key: str = Field(validation_alias="GEMINI_API_KEY")
-    fast_model: str = "gemini-2.5-flash"
-    deep_model: str = "gemini-2.5-pro"
+    fast_model: str = "gemini-3.5-flash"
+    deep_model: str = "gemini-3.1-pro-preview"
     cost_cap_usd: float = 2.00
     temperature: float = 0.1
 

@@ -51,14 +51,18 @@ class CostTracker:
     """
     Track LLM token usage and estimated USD cost per run.
 
-    Pricing (Gemini, as of March 2026 — update if pricing changes):
-    - Flash:  $0.075 / 1M input tokens, $0.30 / 1M output tokens
-    - Pro:    $1.25 / 1M input tokens, $5.00 / 1M output tokens
+    Pricing (Gemini, as of July 2026 — update if pricing changes):
+    - 3.5 Flash:        $1.50 / 1M input tokens, $9.00 / 1M output tokens
+    - 3.1 Pro (preview): $2.00 / 1M input tokens, $12.00 / 1M output tokens (<=200k prompt)
+    - 2.5 Pro (legacy):  $1.25 / 1M input tokens, $5.00 / 1M output tokens
+    - 2.0 Flash (shut down by Google, kept only for historical score_cache entries)
     """
 
     PRICING = {
-        "gemini-2.0-flash": {"input": 0.075 / 1_000_000, "output": 0.30 / 1_000_000},
-        "gemini-2.5-pro":   {"input": 1.25 / 1_000_000, "output": 5.00 / 1_000_000},
+        "gemini-3.5-flash":        {"input": 1.50 / 1_000_000, "output": 9.00 / 1_000_000},
+        "gemini-3.1-pro-preview":  {"input": 2.00 / 1_000_000, "output": 12.00 / 1_000_000},
+        "gemini-2.5-pro":          {"input": 1.25 / 1_000_000, "output": 5.00 / 1_000_000},
+        "gemini-2.0-flash":        {"input": 0.075 / 1_000_000, "output": 0.30 / 1_000_000},
     }
 
     def __init__(self, cost_cap_usd: float = 2.0) -> None:
@@ -69,7 +73,7 @@ class CostTracker:
         self._calls: list[dict] = []
 
     def record(self, model: str, input_tokens: int, output_tokens: int, agent: str = "") -> None:
-        pricing = self.PRICING.get(model, self.PRICING["gemini-2.0-flash"])
+        pricing = self.PRICING.get(model, self.PRICING["gemini-3.5-flash"])
         cost = input_tokens * pricing["input"] + output_tokens * pricing["output"]
 
         self.total_input_tokens += input_tokens
